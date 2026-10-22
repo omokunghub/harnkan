@@ -182,3 +182,20 @@ test('payment QR: own folder only, visible to groupmates but not outsiders', asy
   expect(await as(B, `select name from storage.objects where bucket_id = 'payment-qr'`)).toHaveLength(1) // groupmate sees it
   expect(await as(C, `select name from storage.objects where bucket_id = 'payment-qr'`)).toHaveLength(0) // outsider doesn't
 })
+
+test('item details and crop box: validated, details edits logged, crop moves not', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'KFC', 129) returning id`, [g, mA])
+  const [{ id: item }] = await as(A, `insert into bill_items (bill_id, name, line_total, details, crop) values ($1, 'ImKhoom2_AG', 129, '2 COB', '{100,20,140,980}') returning id`, [bill])
+  await expect(as(A, `update bill_items set crop = '{100,20,90,980}' where id = $1`, [item])).rejects.toThrow() // ymax < ymin
+  await expect(as(A, `update bill_items set crop = '{1,2,3}' where id = $1`, [item])).rejects.toThrow()
+  await expect(as(A, `update bill_items set crop = '{0,0,10,1001}' where id = $1`, [item])).rejects.toThrow()
+  await q(`update bills set created_at = now() - interval '1 hour' where id = $1`, [bill]) // past the posting window
+  await as(A, `update bill_items set crop = '{90,0,150,1000}' where id = $1`, [item])
+  await as(A, `update bill_items set details = '2 COB, HS Piece(2), Pepsi' where id = $1`, [item])
+  const log = await q(`select action, detail from activity where action = 'item_update'`)
+  expect(log).toHaveLength(1)
+  expect(Object.keys(log[0].detail.changes)).toEqual(['details'])
+})

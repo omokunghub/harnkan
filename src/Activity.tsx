@@ -5,7 +5,7 @@ export const ACTIVITY_COLS = 'id, actor, action, detail, created_at'
 
 const FIELDS: Record<string, string> = {
   title: 'ชื่อ', grand_total: 'ยอดสุทธิ', service_charge: 'SC', vat: 'VAT', discount: 'ส่วนลด',
-  vat_included: 'รวม VAT', currency: 'สกุลเงิน', paid_by: 'คนจ่าย', line_total: 'ราคา', qty: 'จำนวน', name: 'ชื่อ', spent_on: 'วันที่',
+  vat_included: 'รวม VAT', currency: 'สกุลเงิน', paid_by: 'คนจ่าย', line_total: 'ราคา', qty: 'จำนวน', name: 'ชื่อ', spent_on: 'วันที่', details: 'รายละเอียด',
 }
 const n = (x: unknown) => Number(x).toLocaleString('th-TH')
 

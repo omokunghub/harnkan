@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
-import { allocate, fmt, paidBy, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
+import { allocate, checkReceipt, fmt, paidBy, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
 import { PaymentQR, PromptPayQR } from './SettleUp'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
+import { CropEditor, CropView, type Box } from './Crop'
 
-type ItemRow = Item & { id: string; name: string; name_translated: string | null; position: number }
+type ItemRow = Item & { id: string; name: string; name_translated: string | null; position: number; details: string | null; crop: Box | null }
 type BillRow = Omit<Bill, 'bill_items'> & { id: string; group_id: string; title: string; image_path: string | null; bill_items: ItemRow[] }
 type Comment = { id: string; member_id: string; body: string; created_at: string }
 
@@ -21,6 +22,8 @@ export default function BillPage({ session }: { session: Session }) {
   const [text, setText] = useState('')
   const [log, setLog] = useState<Entry[]>([])
   const [tickFor, setTickFor] = useState<string>() // whose items a tap toggles; default me
+  const [draft, setDraft] = useState<{ id: string; name: string; details: string; line_total: string }>() // ✏️ inline edit
+  const [cropFor, setCropFor] = useState<ItemRow>() // ✂️ editor
   const img = useSignedUrl(bill?.image_path)
 
   const load = useCallback(async () => {
@@ -75,6 +78,17 @@ export default function BillPage({ session }: { session: Session }) {
     if (bill.image_path) await sb.storage.from('receipts').remove([bill.image_path])
     nav(`/g/${bill.group_id}`, { replace: true })
   }
+  const saveItem = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!draft) return
+    must(await sb.from('bill_items').update({ name: draft.name.trim(), details: draft.details.trim() || null, line_total: Number(draft.line_total) }).eq('id', draft.id))
+    setDraft(undefined); load()
+  }
+  const saveCrop = async (crop: Box | null) => {
+    must(await sb.from('bill_items').update({ crop }).eq('id', cropFor!.id))
+    setCropFor(undefined); load()
+  }
+  const warnings = simple ? [] : checkReceipt(bill)
   const comment = async (e: FormEvent) => {
     e.preventDefault()
     if (!me) return
@@ -105,7 +119,8 @@ export default function BillPage({ session }: { session: Session }) {
           </button>
         ))}
       </div>
-      <p className="muted">เลือกคนด้านบน แล้วแตะรายการที่เป็นของคนนั้น · 👥 หารหลายคน/หลายส่วน</p>
+      <p className="muted">เลือกคนด้านบน แล้วแตะรายการที่เป็นของคนนั้น · 👥 หารหลายคน · ✏️ แก้รายการ{img ? ' · ✂️ ตัดภาพบรรทัด' : ''}</p>
+      {warnings.map((w) => <p key={w} className="bad">⚠ {w}</p>)}
 
       {bill.bill_items.map((i) => {
         const ticked = i.item_shares.some((s) => s.member_id === who)
@@ -113,12 +128,34 @@ export default function BillPage({ session }: { session: Session }) {
           <div key={i.id} className={`card item ${ticked ? 'mine' : ''} ${i.item_shares.length ? '' : 'unclaimed'}`}>
             <div className="row">
               <button className="item-main" aria-pressed={ticked} onClick={() => toggle(i)}>
-                <span>{ticked ? '☑' : '☐'} {i.name}{i.name_translated && i.name_translated !== i.name && <small className="muted"> · {i.name_translated}</small>}</span>
+                <span>{ticked ? '☑' : '☐'} {i.name}{i.name_translated && i.name_translated !== i.name && <small className="muted"> · {i.name_translated}</small>}
+                  {i.details && <small className="muted item-details">+ {i.details}</small>}</span>
                 <span>{fmt(toMinor(i.line_total, cur), cur)}</span>
               </button>
               <button className="ghost" aria-label="เลือกคนหาร" aria-expanded={open === i.id} onClick={() => setOpen(open === i.id ? undefined : i.id)}>👥</button>
             </div>
-            <small className="muted">{i.item_shares.map((s) => name(s.member_id) + (s.weight > 1 ? ` ×${s.weight}` : '')).join(', ')}</small>
+            <div className="row">
+              <small className="muted">{i.item_shares.map((s) => name(s.member_id) + (s.weight > 1 ? ` ×${s.weight}` : '')).join(', ')}</small>
+              <span className="item-tools">
+                <button className="icon-btn" aria-label={`แก้รายการ ${i.name}`}
+                  onClick={() => setDraft(draft?.id === i.id ? undefined : { id: i.id, name: i.name, details: i.details ?? '', line_total: String(i.line_total) })}>✏️</button>
+                {img && <button className="icon-btn" aria-label={`ตัดภาพบรรทัด ${i.name}`} onClick={() => setCropFor(i)}>✂️</button>}
+              </span>
+            </div>
+            {img && i.crop && <CropView src={img} box={i.crop} />}
+            {draft?.id === i.id && (
+              <form onSubmit={saveItem} className="item-edit-inline">
+                <input required aria-label="ชื่อรายการ" maxLength={200} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                <input aria-label="รายละเอียด / add-on" placeholder="รายละเอียด / add-on" maxLength={500} value={draft.details}
+                  onChange={(e) => setDraft({ ...draft, details: e.target.value })} />
+                <input required aria-label="ราคา" type="number" step="any" min="0" inputMode="decimal" value={draft.line_total}
+                  onChange={(e) => setDraft({ ...draft, line_total: e.target.value })} />
+                <div className="row">
+                  <button type="button" className="ghost" onClick={() => setDraft(undefined)}>ยกเลิก</button>
+                  <button>บันทึก</button>
+                </div>
+              </form>
+            )}
             {open === i.id && (
               <div className="stack">
                 {members.map((m) => {
@@ -143,6 +180,8 @@ export default function BillPage({ session }: { session: Session }) {
         <button className="ghost" onClick={() => share(bill.title, location.href)}>แชร์ให้เพื่อนมาติ๊ก</button>
       </div>
       </>}
+
+      {cropFor && img && <CropEditor src={img} box={cropFor.crop} onSave={saveCrop} onClose={() => setCropFor(undefined)} />}
 
       <h2>แต่ละคนจ่าย</h2>
       <div className="table-wrap">

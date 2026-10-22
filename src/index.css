@@ -137,3 +137,15 @@ header .grow { flex: 1; }
 .list-row .grow { flex: 1; text-align: left; }
 .tabs { align-items: center; }
 .grow-btn { flex: 1; }
+.crop-view { position: relative; overflow: hidden; width: 100%; margin-top: 6px; border-radius: 6px; background: #fff; }
+.crop-view img { position: absolute; max-width: none; }
+.crop-modal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.92); color: #fff; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)); }
+.crop-modal p { margin: 0; text-align: center; }
+.crop-stage { position: relative; align-self: center; justify-self: center; touch-action: none; user-select: none; max-height: 100%; }
+.crop-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 160px); }
+.crop-rect { position: absolute; border: 2px solid var(--accent); background: rgba(18,128,92,.25); pointer-events: none; }
+.item-details { display: block; font-size: .85rem; }
+.item-edit-inline { display: grid; gap: 8px; margin-top: 8px; }
+.details-input { grid-column: 1 / -1; }
+.item-tools { display: flex; gap: 4px; flex: none; }
+.item-tools .icon-btn { width: 40px; height: 40px; font-size: 1.1rem; }

@@ -2,11 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
+import { CropView, cleanBox, type Box } from './Crop'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
 import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
 
-type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number }
-const newRow = (name = '', line_total = 0): Row => ({ id: crypto.randomUUID(), name, name_translated: '', qty: 1, line_total })
+type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number; details: string; crop: Box | null }
+const newRow = (name = '', line_total = 0): Row => ({ id: crypto.randomUUID(), name, name_translated: '', qty: 1, line_total, details: '', crop: null })
 
 const toBase64 = (b: Blob) =>
   new Promise<string>((res) => {
@@ -42,7 +43,7 @@ export default function NewBill({ session }: { session: Session }) {
       setPayers(Object.fromEntries(b.bill_payers.map((p: { member_id: string; amount: number }) => [p.member_id, p.amount])))
       setF({ title: b.title, currency: b.currency, paid_by: b.paid_by, service_charge: b.service_charge, vat: b.vat, vat_included: b.vat_included, discount: b.discount })
       setItems(b.bill_items.sort((x: { position: number }, y: { position: number }) => x.position - y.position)
-        .map(({ id, name, name_translated, qty, line_total }: Row) => ({ id, name, name_translated: name_translated ?? '', qty, line_total })))
+        .map(({ id, name, name_translated, qty, line_total, details, crop }: Row) => ({ id, name, name_translated: name_translated ?? '', qty, line_total, details: details ?? '', crop })))
     })
   }, [editing])
   useEffect(() => {
@@ -62,7 +63,9 @@ export default function NewBill({ session }: { session: Session }) {
       setBlob(b); setPreview(URL.createObjectURL(b))
       const { data: d, error } = await sb.functions.invoke('scan-receipt', { body: { image: await toBase64(b), lang: 'Thai' } })
       if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message)
-      setItems(d.items.map((i: Row) => ({ ...newRow(i.name, i.line_total), name_translated: i.name_translated, qty: i.qty ?? 1 })))
+      setItems(d.items.map((i: Row & { box_2d?: unknown }) => ({
+        ...newRow(i.name, i.line_total), name_translated: i.name_translated, qty: i.qty ?? 1, details: i.details ?? '', crop: cleanBox(i.box_2d),
+      })))
       setF((f) => ({
         ...f,
         title: f.title || d.merchant || 'ใบเสร็จ',
@@ -186,6 +189,9 @@ export default function NewBill({ session }: { session: Session }) {
               <input aria-label="ราคา" type="number" step="any" min="0" required value={i.line_total} onChange={(e) => setItem(i.id, { line_total: Number(e.target.value) })} />
               <button type="button" className="ghost" aria-label="ลบรายการ" onClick={() => setItems(items.filter((x) => x.id !== i.id))}>✕</button>
               {i.name_translated && i.name_translated !== i.name && <small className="muted">{i.name_translated}</small>}
+              <input className="details-input" aria-label="รายละเอียด / add-on" placeholder="รายละเอียด / add-on (ถ้ามี)" maxLength={500}
+                value={i.details} onChange={(e) => setItem(i.id, { details: e.target.value })} />
+              {preview && i.crop && <span className="details-input"><CropView src={preview} box={i.crop} /></span>}
             </div>
           ))}
           <button type="button" className="ghost" onClick={() => setItems([...items, newRow()])}>+ เพิ่มรายการ</button>

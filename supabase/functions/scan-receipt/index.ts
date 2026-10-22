@@ -25,6 +25,8 @@ const schema = {
           name_translated: { type: 'STRING' },
           qty: num,
           line_total: { type: 'NUMBER' },
+          details: { type: 'STRING', nullable: true },
+          box_2d: { type: 'ARRAY', items: { type: 'INTEGER' }, description: '[ymin, xmin, ymax, xmax] of this item and its detail lines, 0-1000' },
         },
         required: ['name', 'name_translated', 'line_total'],
       },
@@ -39,7 +41,9 @@ const schema = {
 }
 const prompt = (lang: string) => `Extract this receipt.
 - Copy numbers exactly as printed. Never calculate a value that is not printed; use null instead.
-- items: one entry per purchased line; line_total is the line's printed amount (qty × unit price). Do not include subtotal, service charge, tax, discount or total lines as items.
+- items: one entry per line that has its own printed price; line_total is that printed amount (qty × unit price). Do not include subtotal, service charge, tax, discount or total lines as items.
+- Lines without their own price (add-ons, options, set/combo components such as "Addon - None", "2 COB", "PEPSI 340 ML") are NOT items: put them, comma-separated, in "details" of the priced item they belong to (usually the priced line just above them; a set name is followed by its components).
+- box_2d: bounding box of the item's line(s) on the image, including its detail lines, as [ymin, xmin, ymax, xmax] scaled 0-1000.
 - service_charge: the service charge line (rate in percent, e.g. 10).
 - vat: the VAT/tax line (rate in percent, e.g. 7). included=true when the receipt says prices already include VAT (e.g. "VAT included", "รวมภาษีมูลค่าเพิ่ม", "内税", "税込"), false when VAT is added on top.
 - discount: total discount as a positive number.

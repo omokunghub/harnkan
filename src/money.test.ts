@@ -113,3 +113,13 @@ test('convert balances to one currency (estimate)', () => {
   expect(Object.fromEntries(convertNet(all, 'THB', { JPY: 0.2 }))).toEqual({ a: 5000, b: -5000 })
   expect(Object.fromEntries(convertNet(all, 'JPY', { THB: 5 }))).toEqual({ a: 250, b: -250 })
 })
+
+test('crop boxes from the AI are cleaned up', async () => {
+  const { cleanBox } = await import('./Crop')
+  expect(cleanBox([100, 20, 140, 980])).toEqual([92, 12, 148, 988]) // padded
+  expect(cleanBox([140, 980, 100, 20], 0)).toEqual([100, 20, 140, 980]) // reordered
+  expect(cleanBox([-50, 0, 2000, 1000], 0)).toEqual([0, 0, 1000, 1000]) // clamped
+  expect(cleanBox([100, 100, 101, 900], 0)).toBeNull() // too thin
+  expect(cleanBox('nope')).toBeNull()
+  expect(cleanBox([1, 2, 3])).toBeNull()
+})
