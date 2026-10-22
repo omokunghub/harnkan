@@ -1,12 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, MEMBER_COLS, memberName, must, sb, shrink, type Member } from './supabase'
+import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
 import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
 
 type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number }
 const newRow = (name = '', line_total = 0): Row => ({ id: crypto.randomUUID(), name, name_translated: '', qty: 1, line_total })
-const CURRENCIES = ['THB', 'JPY', 'USD', 'EUR', 'KRW', 'CNY', 'SGD', 'HKD', 'TWD', 'VND', 'MYR', 'GBP', 'AUD']
 
 const toBase64 = (b: Blob) =>
   new Promise<string>((res) => {
@@ -46,7 +45,7 @@ export default function NewBill({ session }: { session: Session }) {
     if (!groupId) return
     sb.from('members').select(MEMBER_COLS).eq('group_id', groupId).then((r) => {
       const ms = must(r) as unknown as Member[]
-      setMembers(ms)
+      setMembers(active(ms))
       setF((f) => ({ ...f, paid_by: f.paid_by || ms.find((m) => m.user_id === session.user.id)?.id || '' }))
     })
   }, [groupId, session.user.id])
@@ -71,10 +70,12 @@ export default function NewBill({ session }: { session: Session }) {
       }))
       setGrand(String(d.grand_total ?? ''))
       setPrintedSubtotal(d.subtotal ?? null)
-      setStatus('ตรวจรายการให้ตรงกับใบเสร็จก่อนโพสต์')
+      setStatus(`ตรวจรายการให้ตรงกับใบเสร็จก่อนโพสต์ · อ่านด้วย ${d.model}`)
     } catch (e) {
       const msg = (e as Error).message
-      setStatus(msg === 'quota' ? 'โควต้า AI วันนี้หมดแล้ว — กรอกเองได้เลย' : `อ่านไม่สำเร็จ (${msg}) — กรอกเองได้เลย`)
+      setStatus(msg === 'quota' ? 'โควต้า AI วันนี้หมดทุกรุ่นแล้ว — กรอกเองได้เลย'
+        : msg === 'busy' ? 'AI ทุกรุ่นคนใช้เยอะอยู่ ลองใหม่อีกสักครู่ หรือกรอกเองได้เลย'
+        : `อ่านไม่สำเร็จ (${msg}) — กรอกเองได้เลย`)
       setItems((it) => (it.length ? it : [newRow()]))
     }
     setBusy(false)
@@ -149,8 +150,9 @@ export default function NewBill({ session }: { session: Session }) {
               </select>
             </label>
             <label>สกุลเงิน
-              <input required list="cur" pattern="[A-Z]{3}" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} />
-              <datalist id="cur">{CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+              <select value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
+                {[...new Set([f.currency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}
+              </select>
             </label>
           </div>
 

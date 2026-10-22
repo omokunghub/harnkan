@@ -1,8 +1,11 @@
-// Reads a receipt photo with Gemini. Secrets: GEMINI_API_KEY (required), GEMINI_MODEL (optional).
+// Reads a receipt photo with Gemini. Secrets: GEMINI_API_KEY (required), GEMINI_MODELS (optional, comma-separated, tried in order).
 // Deploy: npx supabase functions deploy scan-receipt
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-flash-lite-latest'
+// Busy/out-of-quota model → next one. Free-tier quota is per model, so the chain also adds up quota.
+const MODELS = (Deno.env.get('GEMINI_MODELS') ?? Deno.env.get('GEMINI_MODEL') ?? 'gemini-flash-lite-latest,gemini-flash-latest,gemini-2.5-flash-lite')
+  .split(',').map((m) => m.trim()).filter(Boolean)
+const RETRYABLE = new Set([404, 408, 429, 500, 502, 503, 504]) // 404 = model retired → next one
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -58,16 +61,36 @@ Deno.serve(async (req) => {
   const { image, mime = 'image/jpeg', lang = 'Thai' } = await req.json()
   if (typeof image !== 'string' || image.length > 8_000_000) return json({ error: 'bad image' }, 400)
 
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': Deno.env.get('GEMINI_API_KEY')! },
-    body: JSON.stringify({
-      contents: [{ parts: [{ inline_data: { mime_type: mime, data: image } }, { text: prompt(lang) }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0 },
-    }),
+  const body = JSON.stringify({
+    contents: [{ parts: [{ inline_data: { mime_type: mime, data: image } }, { text: prompt(lang) }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0 },
   })
-  if (!r.ok) return json({ error: r.status === 429 ? 'quota' : `gemini ${r.status}`, detail: await r.text() }, 502)
-  const text = (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) return json({ error: 'no result' }, 502)
-  return json(JSON.parse(text))
+  const tried: string[] = []
+  let quotaOnly = true
+  for (const model of MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) { // one quick retry for a busy (503) model
+      let r: Response
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': Deno.env.get('GEMINI_API_KEY')! },
+          body,
+          signal: AbortSignal.timeout(25_000),
+        })
+      } catch {
+        tried.push(`${model}:timeout`); quotaOnly = false; break
+      }
+      if (r.ok) {
+        const text = (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text
+        if (text) return json({ ...JSON.parse(text), model })
+        tried.push(`${model}:empty`); quotaOnly = false; break
+      }
+      tried.push(`${model}:${r.status}`)
+      if (r.status !== 429) quotaOnly = false
+      if (!RETRYABLE.has(r.status)) return json({ error: `gemini ${r.status}`, detail: await r.text(), tried }, 502)
+      if (r.status !== 503 || attempt) break
+      await new Promise((ok) => setTimeout(ok, 1500))
+    }
+  }
+  return json({ error: quotaOnly ? 'quota' : 'busy', tried }, 502)
 })

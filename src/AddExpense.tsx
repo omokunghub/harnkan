@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
+import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
 import { Avatar } from './Avatar'
 import { detectSplit, fmt, splitWeights, toMinor, type SplitMode } from './money'
 
@@ -20,6 +20,8 @@ export default function AddExpense({ session }: { session: Session }) {
   const [values, setValues] = useState<Record<string, number>>({})
   const [itemId, setItemId] = useState<string>()
   const [showSplit, setShowSplit] = useState(false)
+  const [payers, setPayers] = useState<Record<string, number>>({}) // empty = single payer f.paid_by
+  const [showPayers, setShowPayers] = useState(false)
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -30,18 +32,22 @@ export default function AddExpense({ session }: { session: Session }) {
       const w = Object.fromEntries(it.item_shares.map((s: { member_id: string; weight: number }) => [s.member_id, s.weight]))
       const d = detectSplit(b.grand_total, w, b.currency)
       setGroupId(b.group_id); setItemId(it.id); setMode(d.mode); setValues(d.values)
+      setPayers(Object.fromEntries(b.bill_payers.map((p: { member_id: string; amount: number }) => [p.member_id, p.amount])))
       setF({ title: b.title, currency: b.currency, amount: String(b.grand_total), paid_by: b.paid_by, spent_on: b.spent_on })
     })
   }, [editing])
   useEffect(() => {
     if (!groupId) return
     sb.from('members').select(MEMBER_COLS).eq('group_id', groupId).then((r) => {
-      const ms = must(r) as unknown as Member[]
+      const ms = active(must(r) as unknown as Member[])
       setMembers(ms)
       setF((f) => ({ ...f, paid_by: f.paid_by || ms.find((m) => m.user_id === session.user.id)?.id || '' }))
       setValues((v) => (Object.keys(v).length ? v : Object.fromEntries(ms.map((m) => [m.id, 1]))))
     })
   }, [groupId, session.user.id])
+  useEffect(() => {
+    if (groupId && !editing) sb.from('groups').select('currency').eq('id', groupId).single().then((r) => r.data && setF((f) => ({ ...f, currency: r.data.currency })))
+  }, [groupId, editing])
 
   const cur = /^[A-Z]{3}$/.test(f.currency) ? f.currency : 'THB'
   const total = Number(f.amount) || 0
@@ -53,6 +59,11 @@ export default function AddExpense({ session }: { session: Session }) {
     setMode(m)
     setValues(Object.fromEntries(members.map((mb) => [mb.id, m === 'equal' || m === 'shares' ? 1 : 0])))
   }
+  const multi = Object.keys(payers).length > 0
+  const paidSum = Object.values(payers).reduce((a, v) => a + toMinor(v, cur), 0)
+  const payerErr = multi && paidSum !== toMinor(total, cur)
+    ? `จ่ายรวม ${fmt(paidSum, cur)} จาก ${fmt(toMinor(total, cur), cur)} — เหลือ ${fmt(toMinor(total, cur) - paidSum, cur)}` : ''
+  const payerLabel = multi ? `${Object.keys(payers).length} คน` : nameOf(members.find((m) => m.id === f.paid_by) ?? members[0] ?? ({} as Member))
   const summary = mode === 'equal'
     ? chosen === members.length ? 'เท่ากันทุกคน' : `เท่ากัน ${chosen} คน`
     : MODES.find(([m]) => m === mode)![1]
@@ -60,14 +71,18 @@ export default function AddExpense({ session }: { session: Session }) {
   const save = async (e: FormEvent) => {
     e.preventDefault()
     if (error) return setShowSplit(true)
+    if (payerErr) return setShowPayers(true)
     try {
       const billId = editing ?? crypto.randomUUID()
       const iid = itemId ?? crypto.randomUUID()
-      const row = { group_id: groupId, title: f.title, currency: cur, paid_by: f.paid_by, spent_on: f.spent_on, grand_total: total,
+      const paidBy = multi ? Object.entries(payers).sort((a, b) => b[1] - a[1])[0][0] : f.paid_by
+      const row = { group_id: groupId, title: f.title, currency: cur, paid_by: paidBy, spent_on: f.spent_on, grand_total: total,
         service_charge: 0, vat: 0, discount: 0, vat_included: false }
       const shares = Object.entries(weights).map(([member_id, weight]) => ({ item_id: iid, member_id, weight }))
       if (editing) must(await sb.from('bills').update(row).eq('id', billId))
       else must(await sb.from('bills').insert({ ...row, id: billId }))
+      must(await sb.from('bill_payers').delete().eq('bill_id', billId))
+      if (multi) must(await sb.from('bill_payers').insert(Object.entries(payers).map(([member_id, amount]) => ({ bill_id: billId, member_id, amount }))))
       must(await sb.from('bill_items').upsert({ id: iid, bill_id: billId, name: f.title, line_total: total }))
       must(await sb.from('item_shares').upsert(shares))
       must(await sb.from('item_shares').delete().eq('item_id', iid).not('member_id', 'in', `(${Object.keys(weights).join(',')})`))
@@ -87,21 +102,49 @@ export default function AddExpense({ session }: { session: Session }) {
         <input required className="big-title" placeholder="รายละเอียด เช่น ค่าน้ำมัน" aria-label="รายละเอียด"
           value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         <div className="amount-row">
-          <input required list="cur" pattern="[A-Z]{3}" aria-label="สกุลเงิน" className="cur" value={f.currency}
-            onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} />
-          <datalist id="cur">{['THB', 'JPY', 'USD', 'EUR', 'KRW', 'CNY', 'SGD'].map((c) => <option key={c} value={c} />)}</datalist>
+          <select aria-label="สกุลเงิน" className="cur" value={cur} onChange={(e) => setF({ ...f, currency: e.target.value })}>
+            {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
           <input required type="number" step="any" min="0.01" inputMode="decimal" placeholder="0.00" aria-label="จำนวนเงิน"
             className="big-amount" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
         </div>
 
         <p className="sentence">
           จ่ายโดย{' '}
-          <select className="pill" aria-label="ใครจ่าย" value={f.paid_by} onChange={(e) => setF({ ...f, paid_by: e.target.value })}>
-            {members.map((m) => <option key={m.id} value={m.id}>{nameOf(m)}</option>)}
-          </select>{' '}
+          <button type="button" className="pill" aria-expanded={showPayers} onClick={() => setShowPayers(!showPayers)}>{payerLabel}</button>{' '}
           หาร{' '}
           <button type="button" className="pill" aria-expanded={showSplit} onClick={() => setShowSplit(!showSplit)}>{summary}</button>
         </p>
+
+        {showPayers && (
+          <section className="card stack" aria-label="ใครจ่าย">
+            {!multi ? <>
+              {members.map((m) => (
+                <button key={m.id} type="button" className="list-row" aria-pressed={m.id === f.paid_by}
+                  onClick={() => { setF({ ...f, paid_by: m.id }); setShowPayers(false) }}>
+                  <Avatar member={m} size={36} /><span className="grow">{nameOf(m)}</span>{m.id === f.paid_by && '✓'}
+                </button>
+              ))}
+              <button type="button" className="list-row" onClick={() => setPayers({ [f.paid_by]: total })}>
+                <span className="row-icon" aria-hidden>👥</span>หลายคนช่วยกันจ่าย
+              </button>
+            </> : <>
+              {members.map((m) => (
+                <label key={m.id} className="split-row">
+                  <span className="who"><Avatar member={m} size={36} />{nameOf(m)}</span>
+                  <input type="number" step="any" min="0" inputMode="decimal" className="narrow" placeholder="0.00" aria-label={`${nameOf(m)} จ่าย`}
+                    value={payers[m.id] || ''} onChange={(e) => {
+                      const v = Number(e.target.value), next = { ...payers, [m.id]: v }
+                      if (!v) delete next[m.id]
+                      setPayers(next)
+                    }} />
+                </label>
+              ))}
+              <p className={payerErr ? 'bad' : 'muted'}>{payerErr || `จ่ายรวม ${fmt(paidSum, cur)} ครบแล้ว ✓`}</p>
+              <button type="button" className="ghost" onClick={() => setPayers({})}>กลับไปจ่ายคนเดียว</button>
+            </>}
+          </section>
+        )}
 
         {showSplit && (
           <section className="card stack">

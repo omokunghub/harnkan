@@ -125,3 +125,47 @@ test('group covers: members only, our bucket only', async () => {
   await as(A, `insert into storage.objects (bucket_id, name) values ('covers', $1)`, [`${g}/1.jpg`])
   await expect(as(C, `insert into storage.objects (bucket_id, name) values ('covers', $1)`, [`${g}/2.jpg`])).rejects.toThrow()
 })
+
+test('only the app admin can remove members or reset the invite; removed members lose access', async () => {
+  const { q, as } = await setup()
+  await q(`insert into app_admins (user_id) values ($1)`, [A])
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code: code1 }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [code1])
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: mB }] = await q(`select id from members where user_id = $1`, [B])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'x', 100) returning id`, [g, mA])
+
+  await expect(as(B, `select remove_member($1)`, [mA])).rejects.toThrow('admin only')
+  await expect(as(B, `select reset_invite($1)`, [g])).rejects.toThrow('admin only')
+  expect(await as(B, `select * from app_admins`)).toHaveLength(0)
+  await expect(as(B, `insert into app_admins values ($1)`, [B])).rejects.toThrow()
+
+  await as(A, `select remove_member($1)`, [mB])
+  expect(await as(B, `select * from bills`)).toHaveLength(0) // lost access
+  expect((await as(A, `select removed_at from members where id = $1`, [mB]))[0].removed_at).not.toBeNull() // name kept
+
+  const [{ reset_invite: code2 }] = await as(A, `select reset_invite($1)`, [g])
+  await expect(as(B, `select join_group($1)`, [code1])).rejects.toThrow('invalid invite') // old link dead
+  await as(B, `select join_group($1)`, [code2]) // new link brings them back
+  expect(await as(B, `select * from bills where id = $1`, [bill])).toHaveLength(1)
+  const log = (await q(`select action from activity where action in ('member_remove', 'invite_reset')`)).map((r) => r.action)
+  expect(log).toEqual(['member_remove', 'invite_reset'])
+})
+
+test('several payers per bill, all inside the group', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [invite_code])
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: mB }] = await q(`select id from members where user_id = $1`, [B])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'x', 100) returning id`, [g, mA])
+  await as(B, `insert into bill_payers (bill_id, member_id, amount) values ($1, $2, 60), ($1, $3, 40)`, [bill, mA, mB])
+  const [{ id: g2 }] = await as(C, `select create_group('other') as id`)
+  const [{ id: mC }] = await q(`select id from members where group_id = $1`, [g2])
+  await expect(as(A, `insert into bill_payers (bill_id, member_id, amount) values ($1, $2, 1)`, [bill, mC])).rejects.toThrow()
+  expect(await as(C, `select * from bill_payers`)).toHaveLength(0)
+  await as(A, `update groups set currency = 'JPY' where id = $1`, [g])
+  await expect(as(A, `update groups set currency = 'yen' where id = $1`, [g])).rejects.toThrow()
+})

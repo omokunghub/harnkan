@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
-import { allocate, fmt, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
+import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
+import { allocate, fmt, paidBy, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
 import { PromptPayQR } from './SettleUp'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
@@ -52,6 +52,7 @@ export default function BillPage({ session }: { session: Session }) {
   const taxed = bill.service_charge > 0 || bill.vat > 0 || bill.discount > 0
   const name = (mid: string) => memberName(members.find((m) => m.id === mid))
   const payer = members.find((m) => m.id === bill.paid_by)
+  const payers = paidBy(bill)
   const shares = allocate(bill)
   const mine = shares.find((p) => p.member_id === me?.id)
   const unclaimed = bill.bill_items.filter((i) => !i.item_shares.length)
@@ -88,7 +89,9 @@ export default function BillPage({ session }: { session: Session }) {
         <h1>{bill.title}</h1>
         <Link to={simple ? `/b/${id}/expense` : `/b/${id}/edit`}>แก้</Link>
       </header>
-      <p className="muted">{memberName(payer)} จ่าย {fmt(toMinor(bill.grand_total, cur), cur)}</p>
+      <p className="muted">{payers.length > 1
+        ? payers.map(([m, v]) => `${name(m)} จ่าย ${fmt(v, cur)}`).join(' · ')
+        : `${memberName(payer)} จ่าย ${fmt(toMinor(bill.grand_total, cur), cur)}`}</p>
       {img && <a href={img} target="_blank"><img className="receipt" src={img} alt="ใบเสร็จ" /></a>}
 
       {!simple && <>
@@ -96,7 +99,7 @@ export default function BillPage({ session }: { session: Session }) {
       {notYet.length > 0 && <p className="muted">ยังไม่ได้ติ๊ก: {notYet.map(memberName).join(', ')}</p>}
       <div className="chips" role="group" aria-label="ติ๊กให้ใคร">
         <span className="muted">ติ๊กให้:</span>
-        {members.map((m) => (
+        {active(members).map((m) => (
           <button key={m.id} className={m.id === who ? '' : 'ghost'} aria-pressed={m.id === who} onClick={() => setTickFor(m.id)}>
             <Avatar member={m} size={24} /> {m.id === me?.id ? 'ฉัน' : memberName(m)}
           </button>
@@ -159,7 +162,7 @@ export default function BillPage({ session }: { session: Session }) {
       </div>
       {bill.vat_included && <p className="muted">ราคาในใบเสร็จรวม VAT แล้ว — ช่อง VAT คือส่วนที่รวมอยู่ ไม่ได้บวกเพิ่ม</p>}
 
-      {mine && me && payer && me.id !== payer.id && (
+      {mine && me && payer && me.id !== payer.id && payers.length === 1 && (
         <div className="card mine stack">
           <p>คุณต้องจ่าย <b>{memberName(payer)}</b> <b>{fmt(mine.total, cur)}</b></p>
           {cur === 'THB' && payer.profiles?.promptpay && <PromptPayQR id={payer.profiles.promptpay} amount={toMajor(mine.total, cur)} />}

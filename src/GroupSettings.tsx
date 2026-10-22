@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, MEMBER_COLS, memberName, must, sb, share, shrink, type Member } from './supabase'
-import { balances, fmt } from './money'
+import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, share, shrink, useIsAdmin, useRates, type Member } from './supabase'
+import { balances, convertNet, fmt } from './money'
 import { Avatar } from './Avatar'
 
-export type Group = { id: string; name: string; invite_code: string; type: string; start_on: string | null; end_on: string | null; cover_url: string | null }
+export type Group = { id: string; name: string; invite_code: string; type: string; start_on: string | null; end_on: string | null; cover_url: string | null; currency: string }
 export const GROUP_TYPES: Record<string, [string, string]> = { trip: ['✈️', 'ทริป'], home: ['🏠', 'บ้าน'], couple: ['❤️', 'คู่รัก'], other: ['📋', 'อื่น ๆ'] }
 export const tripDates = (g: Group) =>
   g.start_on && [g.start_on, g.end_on].filter(Boolean).map((d) => new Date(d!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })).join(' – ')
@@ -28,6 +28,8 @@ export function GroupSettings({ session }: { session: Session }) {
   const [net, setNet] = useState<Map<string, Map<string, number>>>(new Map())
   const [guest, setGuest] = useState('')
   const [adding, setAdding] = useState(false)
+  const admin = useIsAdmin()
+  const fx = useRates(group?.currency ?? 'THB')
 
   const load = async () => {
     const [g, m, b, s] = await Promise.all([
@@ -44,6 +46,17 @@ export function GroupSettings({ session }: { session: Session }) {
     e.preventDefault()
     must(await sb.from('members').insert({ group_id: id, guest_name: guest.trim() }))
     setGuest(''); setAdding(false); load()
+  }
+  const remove = async (m: Member, owes: boolean) => {
+    const warn = owes ? '\n\n⚠ คนนี้ยังมียอดค้างอยู่ ควรเคลียร์ก่อน' : ''
+    if (!confirm(`เอา ${memberName(m)} ออกจากกลุ่ม?${warn}\n\nชื่อจะยังอยู่ในบิลเก่า แต่จะเข้ากลุ่มไม่ได้อีกจนกว่าจะได้ลิงก์เชิญใหม่`)) return
+    must(await sb.rpc('remove_member', { m: m.id }))
+    load()
+  }
+  const resetInvite = async () => {
+    if (!confirm('เปลี่ยนลิงก์เชิญ? ลิงก์เก่าที่เคยส่งไปจะใช้ไม่ได้ทันที')) return
+    must(await sb.rpc('reset_invite', { g: id }))
+    load(); alert('เปลี่ยนลิงก์แล้ว กด "ชวนเพื่อนด้วยลิงก์" เพื่อส่งลิงก์ใหม่')
   }
   if (!group) return null
   const typeName = (GROUP_TYPES[group.type] ?? GROUP_TYPES.other)[1]
@@ -77,9 +90,15 @@ export function GroupSettings({ session }: { session: Session }) {
       <button className="list-row" onClick={() => share(`เข้ากลุ่ม ${group.name} ในหารกัน`, `${location.origin}/join/${group.invite_code}`)}>
         <span className="row-icon" aria-hidden>🔗</span>ชวนเพื่อนด้วยลิงก์
       </button>
+      {admin && (
+        <button className="list-row" onClick={resetInvite}>
+          <span className="row-icon" aria-hidden>♻️</span>เปลี่ยนลิงก์เชิญ (ลิงก์เก่าใช้ไม่ได้)
+        </button>
+      )}
 
-      {members.map((m) => {
+      {active(members).map((m) => {
         const mine = [...net].map(([cur, n]) => [cur, n.get(m.id) ?? 0] as const).filter(([, v]) => v)
+        const est = mine.length > 1 && fx ? convertNet(net, group.currency, fx.rates).get(m.id) ?? 0 : null
         return (
           <div key={m.id} className="line">
             <Avatar member={m} size={48} />
@@ -94,7 +113,11 @@ export function GroupSettings({ session }: { session: Session }) {
                   <b className={v > 0 ? 'good' : 'owe'}>{fmt(Math.abs(v), cur)}</b>
                 </span>
               )) : <small className="muted">เคลียร์แล้ว</small>}
+              {est != null && <small className="muted">รวม ≈ {fmt(est, group.currency)}</small>}
             </span>
+            {admin && m.user_id !== session.user.id && (
+              <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}>✕</button>
+            )}
           </div>
         )
       })}
@@ -137,7 +160,7 @@ export function EditGroup() {
   const save = async (e: FormEvent) => {
     e.preventDefault()
     const dates = f.type === 'trip' && hasDates ? { start_on: f.start_on || null, end_on: f.end_on || null } : { start_on: null, end_on: null }
-    const r = await sb.from('groups').update({ name: f.name.trim(), type: f.type, ...dates }).eq('id', id)
+    const r = await sb.from('groups').update({ name: f.name.trim(), type: f.type, currency: f.currency, ...dates }).eq('id', id)
     if (r.error) return setErr(r.error.message.includes('trip_dates') ? 'วันสิ้นสุดต้องไม่ก่อนวันเริ่ม' : r.error.message)
     nav(`/g/${id}/settings`, { replace: true })
   }
@@ -160,6 +183,11 @@ export function EditGroup() {
         </div>
         <label>ชื่อกลุ่ม
           <input required maxLength={60} className="big-title" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        </label>
+        <label>สกุลเงินหลัก (ใช้สรุปยอดรวม)
+          <select value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
+            {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
         </label>
         <fieldset className="type-grid">
           <legend className="muted">ประเภท</legend>

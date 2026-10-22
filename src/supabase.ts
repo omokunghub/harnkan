@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
 
-export type Member = { id: string; user_id: string | null; guest_name: string | null; profiles: { display_name: string; promptpay: string | null; avatar_url: string | null } | null }
-export const MEMBER_COLS = 'id, user_id, guest_name, profiles(display_name, promptpay, avatar_url)'
+export type Member = { id: string; user_id: string | null; guest_name: string | null; removed_at?: string | null; profiles: { display_name: string; promptpay: string | null; avatar_url: string | null } | null }
+export const MEMBER_COLS = 'id, user_id, guest_name, removed_at, profiles(display_name, promptpay, avatar_url)'
+export const active = (ms: Member[]) => ms.filter((m) => !m.removed_at)
 export const memberName = (m?: Member) => (m ? (m.guest_name ?? m.profiles?.display_name ?? '?') : '?')
 
-export const BILL_COLS = '*, bill_items(*, item_shares(*))'
+export const BILL_COLS = '*, bill_items(*, item_shares(*)), bill_payers(*)'
 
 // undefined = still loading, null = signed out
 export function useSession() {
@@ -48,4 +49,28 @@ export async function shrink(file: File, max = 1600): Promise<Blob> {
 export function must<T>(r: { data: T; error: { message: string } | null }) {
   if (r.error) throw new Error(r.error.message)
   return r.data as NonNullable<T>
+}
+
+export const CURRENCIES = ['THB', 'JPY', 'KRW', 'CNY', 'TWD', 'HKD', 'SGD', 'MYR', 'VND', 'USD', 'EUR', 'GBP', 'AUD']
+
+// Daily FX rates into `to` (1 unit of X = rates[X] `to`), from the ECB via frankfurter.dev. Cached per day in the browser.
+export function useRates(to: string) {
+  const [r, setR] = useState<{ date: string; rates: Record<string, number> }>()
+  useEffect(() => {
+    const key = `fx:${to}:${new Date().toLocaleDateString('sv')}`
+    try { const hit = localStorage.getItem(key); if (hit) return setR(JSON.parse(hit)) } catch { /* private mode */ }
+    fetch(`https://api.frankfurter.dev/v1/latest?base=${to}`).then((res) => res.json()).then((d) => {
+      // API gives 1 `to` = d.rates[X] X; flip it
+      const v = { date: d.date, rates: Object.fromEntries(Object.entries(d.rates as Record<string, number>).map(([c, x]) => [c, 1 / x])) }
+      setR(v)
+      try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* ignore */ }
+    }).catch(() => setR(undefined))
+  }, [to])
+  return r
+}
+
+export function useIsAdmin() {
+  const [admin, setAdmin] = useState(false)
+  useEffect(() => { sb.from('app_admins').select('user_id').then((r) => setAdmin(!!r.data?.length)) }, [])
+  return admin
 }

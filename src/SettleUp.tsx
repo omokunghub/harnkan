@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import generatePayload from 'promptpay-qr'
 import QRCode from 'qrcode'
-import { MEMBER_COLS, memberName, must, sb, shrink, type Member } from './supabase'
+import { active, CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, type Member } from './supabase'
 
 export function PromptPayQR({ id, amount }: { id: string; amount: number }) {
   const [src, setSrc] = useState<string>()
@@ -30,7 +30,7 @@ export default function SettleUp({ session }: { session: Session }) {
   useEffect(() => {
     sb.from('members').select(MEMBER_COLS).eq('group_id', id).then((r) => {
       const ms = must(r) as unknown as Member[]
-      setMembers(ms)
+      setMembers(active(ms))
       setF((f) => ({ ...f, from_member: f.from_member || ms.find((m) => m.user_id === session.user.id)?.id || '' }))
     })
   }, [id, session.user.id])
@@ -72,7 +72,11 @@ export default function SettleUp({ session }: { session: Session }) {
         </label>
         <div className="row">
           <label>จำนวน<input required type="number" step="any" min="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
-          <label>สกุลเงิน<input required pattern="[A-Z]{3}" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></label>
+          <label>สกุลเงิน
+            <select value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
+              {[...new Set([f.currency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
         </div>
         {f.currency === 'THB' && to?.profiles?.promptpay && Number(f.amount) > 0 && <PromptPayQR id={to.profiles.promptpay} amount={Number(f.amount)} />}
         <label>แนบสลิป (ไม่บังคับ)<input type="file" accept="image/*" onChange={(e) => setSlip(e.target.files?.[0])} /></label>

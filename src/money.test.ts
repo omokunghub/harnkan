@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { allocate, applyRates, balances, checkReceipt, detectSplit, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
+import { allocate, applyRates, balances, checkReceipt, convertNet, detectSplit, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
 
 const sh = (...ms: string[]) => ms.map((member_id) => ({ member_id, weight: 1 }))
 const bill = (p: Partial<Bill>): Bill => ({
@@ -97,4 +97,19 @@ test('manual split modes all land on exact totals', () => {
   expect(splitWeights('exact', 500, { a: 100 }, 'THB').error).toMatch('ขาด')
   expect(splitWeights('percent', 500, { a: 50 }, 'THB').error).toMatch('100%')
   expect(splitWeights('equal', 500, { a: 0 }, 'THB').error).toBeTruthy()
+})
+
+test('several payers: credits follow what each actually paid', () => {
+  const b = bill({ paid_by: 'a', grand_total: 300, bill_payers: [{ member_id: 'a', amount: 200 }, { member_id: 'b', amount: 100 }],
+    bill_items: [{ line_total: 300, item_shares: sh('a', 'b', 'c') }] })
+  expect(Object.fromEntries(balances([b], []).get('THB')!)).toEqual({ a: 10000, b: 0, c: -10000 })
+})
+
+test('convert balances to one currency (estimate)', () => {
+  const jp = bill({ currency: 'JPY', paid_by: 'a', grand_total: 1000, bill_items: [{ line_total: 1000, item_shares: sh('a', 'b') }] })
+  const th = bill({ paid_by: 'b', grand_total: 100, bill_items: [{ line_total: 100, item_shares: sh('a', 'b') }] })
+  const all = balances([jp, th], [])
+  // a: +500 JPY, −50 THB ; at 0.2 THB/JPY → +100 − 50 = +50 THB
+  expect(Object.fromEntries(convertNet(all, 'THB', { JPY: 0.2 }))).toEqual({ a: 5000, b: -5000 })
+  expect(Object.fromEntries(convertNet(all, 'JPY', { THB: 5 }))).toEqual({ a: 250, b: -250 })
 })

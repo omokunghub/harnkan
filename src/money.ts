@@ -12,6 +12,7 @@ export type Bill = {
   discount: number
   grand_total: number
   bill_items: Item[]
+  bill_payers?: { member_id: string; amount: number }[] // empty/missing = paid_by paid it all
 }
 export type Settlement = { currency: string; from_member: string; to_member: string; amount: number }
 export type PersonShare = { member_id: string; total: number; net: number; sc: number; vat: number; discount: number }
@@ -92,6 +93,13 @@ export function checkReceipt(bill: Bill, printedSubtotal?: number | null) {
   return warn
 }
 
+// Who paid how much (minor units).
+export function paidBy(b: Bill): [string, number][] {
+  return b.bill_payers?.length
+    ? b.bill_payers.map((p) => [p.member_id, toMinor(p.amount, b.currency)])
+    : [[b.paid_by, toMinor(b.grand_total, b.currency)]]
+}
+
 // Net position per currency per member: + means others owe them.
 export function balances(bills: Bill[], settlements: Settlement[]) {
   const out = new Map<string, Map<string, number>>()
@@ -100,7 +108,7 @@ export function balances(bills: Bill[], settlements: Settlement[]) {
     net.set(m, (net.get(m) ?? 0) + v)
   }
   for (const b of bills) {
-    add(b.currency, b.paid_by, toMinor(b.grand_total, b.currency))
+    for (const [m, v] of paidBy(b)) add(b.currency, m, v)
     for (const p of allocate(b)) add(b.currency, p.member_id === UNCLAIMED ? b.paid_by : p.member_id, -p.total)
   }
   for (const s of settlements) {
@@ -148,4 +156,15 @@ export function detectSplit(total: number, weights: Record<string, number>, cur:
   if (sum === toMinor(total, cur)) return { mode: 'exact', values: map((w) => toMajor(w, cur)) }
   if (sum === 10000) return { mode: 'percent', values: map((w) => w / 100) }
   return { mode: 'shares', values: weights }
+}
+
+// Estimate: fold every currency into one, using rates[cur] = value of 1 `cur` in `to`. Missing rate → that currency is skipped.
+export function convertNet(byCur: Map<string, Map<string, number>>, to: string, rates: Record<string, number>) {
+  const out = new Map<string, number>()
+  for (const [cur, net] of byCur) {
+    const rate = cur === to ? 1 : rates[cur]
+    if (!rate) continue
+    for (const [m, v] of net) out.set(m, (out.get(m) ?? 0) + toMinor(toMajor(v, cur) * rate, to))
+  }
+  return out
 }
