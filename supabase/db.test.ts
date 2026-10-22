@@ -169,3 +169,16 @@ test('several payers per bill, all inside the group', async () => {
   await as(A, `update groups set currency = 'JPY' where id = $1`, [g])
   await expect(as(A, `update groups set currency = 'yen' where id = $1`, [g])).rejects.toThrow()
 })
+
+test('payment QR: own folder only, visible to groupmates but not outsiders', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [invite_code])
+  await as(A, `insert into storage.objects (bucket_id, name) values ('payment-qr', $1)`, [`${A}/1.jpg`])
+  await as(A, `update profiles set payment_qr_path = $1 where id = $2`, [`${A}/1.jpg`, A])
+  await expect(as(A, `update profiles set payment_qr_path = $1 where id = $2`, [`${B}/x.jpg`, A])).rejects.toThrow() // not your folder
+  await expect(as(B, `insert into storage.objects (bucket_id, name) values ('payment-qr', $1)`, [`${A}/2.jpg`])).rejects.toThrow()
+  expect(await as(B, `select name from storage.objects where bucket_id = 'payment-qr'`)).toHaveLength(1) // groupmate sees it
+  expect(await as(C, `select name from storage.objects where bucket_id = 'payment-qr'`)).toHaveLength(0) // outsider doesn't
+})

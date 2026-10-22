@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'reac
 import type { Session } from '@supabase/supabase-js'
 import { BILL_COLS, must, sb, shrink, useSession } from './supabase'
 import { Avatar } from './Avatar'
+import { PaymentQR } from './SettleUp'
 import { balances, fmt } from './money'
 import AddExpense from './AddExpense'
 import { EditGroup, GroupIcon, GroupSettings } from './GroupSettings'
@@ -121,15 +122,15 @@ function Join() {
 }
 
 function Profile({ session }: { session: Session }) {
-  const [p, setP] = useState({ display_name: '', promptpay: '', avatar_url: null as string | null })
+  const [p, setP] = useState({ display_name: '', promptpay: '', avatar_url: null as string | null, payment_qr_path: null as string | null })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const uid = session.user.id
   const meta = session.user.user_metadata
   const googlePic: string | null = meta.avatar_url ?? meta.picture ?? null
   useEffect(() => {
-    sb.from('profiles').select('display_name, promptpay, avatar_url').eq('id', uid).single()
-      .then((r) => { const d = must(r); setP({ display_name: d.display_name, promptpay: d.promptpay ?? '', avatar_url: d.avatar_url }) })
+    sb.from('profiles').select('display_name, promptpay, avatar_url, payment_qr_path').eq('id', uid).single()
+      .then((r) => { const d = must(r); setP({ display_name: d.display_name, promptpay: d.promptpay ?? '', avatar_url: d.avatar_url, payment_qr_path: d.payment_qr_path }) })
   }, [uid])
   const setAvatar = async (avatar_url: string | null) => {
     const old = p.avatar_url
@@ -147,6 +148,24 @@ function Profile({ session }: { session: Session }) {
       setMsg('เปลี่ยนรูปแล้ว')
     } catch (e) {
       setMsg(`อัปโหลดไม่สำเร็จ: ${(e as Error).message}`)
+    }
+    setBusy(false)
+  }
+  // Payment QR lives in a private bucket; groupmates get short-lived signed URLs.
+  const setQr = async (file?: File) => {
+    setBusy(true); setMsg('')
+    try {
+      let path: string | null = null
+      if (file) {
+        path = `${uid}/${Date.now()}.jpg`
+        must(await sb.storage.from('payment-qr').upload(path, await shrink(file, 1200), { contentType: 'image/jpeg' }))
+      }
+      must(await sb.from('profiles').update({ payment_qr_path: path }).eq('id', uid))
+      if (p.payment_qr_path) await sb.storage.from('payment-qr').remove([p.payment_qr_path])
+      setP((x) => ({ ...x, payment_qr_path: path }))
+      setMsg(file ? 'บันทึก QR แล้ว' : 'ลบ QR แล้ว')
+    } catch (e) {
+      setMsg(`ไม่สำเร็จ: ${(e as Error).message}`)
     }
     setBusy(false)
   }
@@ -182,6 +201,16 @@ function Profile({ session }: { session: Session }) {
         </label>
         <button>บันทึก</button>
       </form>
+      <h2>QR รับเงิน</h2>
+      <p className="muted">รูป QR จากแอปธนาคาร / TrueMoney / แอปจ่ายเงินต่างประเทศ เพื่อนในกลุ่มเดียวกันเท่านั้นที่เห็น</p>
+      <PaymentQR path={p.payment_qr_path} />
+      <div className="row">
+        <label className="button ghost">
+          {busy ? 'กำลังอัปโหลด…' : p.payment_qr_path ? 'เปลี่ยนรูป QR' : 'ใส่รูป QR'}
+          <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { setQr(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
+        {p.payment_qr_path && <button type="button" className="ghost" disabled={busy} onClick={() => setQr()}>ลบ QR</button>}
+      </div>
       <button className="ghost" onClick={push}>เปิดแจ้งเตือนบิลใหม่</button>
       <button className="ghost" onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}

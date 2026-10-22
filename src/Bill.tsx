@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
 import { allocate, fmt, paidBy, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
-import { PromptPayQR } from './SettleUp'
+import { PaymentQR, PromptPayQR } from './SettleUp'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 
@@ -166,6 +166,7 @@ export default function BillPage({ session }: { session: Session }) {
         <div className="card mine stack">
           <p>คุณต้องจ่าย <b>{memberName(payer)}</b> <b>{fmt(mine.total, cur)}</b></p>
           {cur === 'THB' && payer.profiles?.promptpay && <PromptPayQR id={payer.profiles.promptpay} amount={toMajor(mine.total, cur)} />}
+          <PaymentQR path={payer.profiles?.payment_qr_path} amountText={fmt(mine.total, cur)} />
           <Link className="button ghost" to={`/g/${bill.group_id}/settle?from=${me.id}&to=${payer.id}&amount=${toMajor(mine.total, cur)}&cur=${cur}`}>
             บันทึกว่าโอนแล้ว
           </Link>

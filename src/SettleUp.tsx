@@ -3,7 +3,18 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import generatePayload from 'promptpay-qr'
 import QRCode from 'qrcode'
-import { active, CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, type Member } from './supabase'
+import { active, CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, useSignedUrl, type Member } from './supabase'
+
+// The payee's own QR image (bank app, TrueMoney, foreign wallets). Amount must be typed in their app.
+export function PaymentQR({ path, amountText }: { path?: string | null; amountText?: string }) {
+  const url = useSignedUrl(path, 'payment-qr')
+  return url ? (
+    <figure className="qr">
+      <a href={url} target="_blank"><img src={url} alt="QR รับเงิน" /></a>
+      <figcaption className="muted">QR รับเงินของเพื่อน — ใส่ยอด{amountText ? ` ${amountText}` : ''} เองในแอปธนาคาร</figcaption>
+    </figure>
+  ) : null
+}
 
 export function PromptPayQR({ id, amount }: { id: string; amount: number }) {
   const [src, setSrc] = useState<string>()
@@ -79,6 +90,7 @@ export default function SettleUp({ session }: { session: Session }) {
           </label>
         </div>
         {f.currency === 'THB' && to?.profiles?.promptpay && Number(f.amount) > 0 && <PromptPayQR id={to.profiles.promptpay} amount={Number(f.amount)} />}
+        <PaymentQR path={to?.profiles?.payment_qr_path} amountText={f.amount ? `${f.amount} ${f.currency}` : ''} />
         <label>แนบสลิป (ไม่บังคับ)<input type="file" accept="image/*" onChange={(e) => setSlip(e.target.files?.[0])} /></label>
         {f.from_member && f.from_member === f.to_member && <p className="bad">คนโอนกับคนรับเป็นคนเดียวกัน</p>}
         <button disabled={f.from_member === f.to_member}>บันทึก</button>

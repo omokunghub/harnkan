@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
 
-export type Member = { id: string; user_id: string | null; guest_name: string | null; removed_at?: string | null; profiles: { display_name: string; promptpay: string | null; avatar_url: string | null } | null }
-export const MEMBER_COLS = 'id, user_id, guest_name, removed_at, profiles(display_name, promptpay, avatar_url)'
+export type Member = { id: string; user_id: string | null; guest_name: string | null; removed_at?: string | null; profiles: { display_name: string; promptpay: string | null; avatar_url: string | null; payment_qr_path?: string | null } | null }
+export const MEMBER_COLS = 'id, user_id, guest_name, removed_at, profiles(display_name, promptpay, avatar_url, payment_qr_path)'
 export const active = (ms: Member[]) => ms.filter((m) => !m.removed_at)
 export const memberName = (m?: Member) => (m ? (m.guest_name ?? m.profiles?.display_name ?? '?') : '?')
 
@@ -22,11 +22,12 @@ export function useSession() {
 }
 
 // Private bucket → short-lived URL for <img>/<a>.
-export function useSignedUrl(path?: string | null) {
+export function useSignedUrl(path?: string | null, bucket = 'receipts') {
   const [url, setUrl] = useState<string>()
   useEffect(() => {
-    if (path) sb.storage.from('receipts').createSignedUrl(path, 3600).then((r) => setUrl(r.data?.signedUrl))
-  }, [path])
+    if (path) sb.storage.from(bucket).createSignedUrl(path, 3600).then((r) => setUrl(r.data?.signedUrl))
+    else setUrl(undefined)
+  }, [path, bucket])
   return url
 }
 
