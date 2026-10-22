@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
+import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
 import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
 
 type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number }
@@ -30,12 +31,15 @@ export default function NewBill({ session }: { session: Session }) {
   const [imagePath, setImagePath] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [payers, setPayers] = useState<Payers>({})
+  const [showPayers, setShowPayers] = useState(false)
 
   useEffect(() => {
     if (!editing) return
     sb.from('bills').select(BILL_COLS).eq('id', editing).single().then((r) => {
       const b = must(r)
       setGroupId(b.group_id); setImagePath(b.image_path); setGrand(String(b.grand_total))
+      setPayers(Object.fromEntries(b.bill_payers.map((p: { member_id: string; amount: number }) => [p.member_id, p.amount])))
       setF({ title: b.title, currency: b.currency, paid_by: b.paid_by, service_charge: b.service_charge, vat: b.vat, vat_included: b.vat_included, discount: b.discount })
       setItems(b.bill_items.sort((x: { position: number }, y: { position: number }) => x.position - y.position)
         .map(({ id, name, name_translated, qty, line_total }: Row) => ({ id, name, name_translated: name_translated ?? '', qty, line_total })))
@@ -95,11 +99,16 @@ export default function NewBill({ session }: { session: Session }) {
     setGrand('')
   }
 
+  const me = members.find((mb) => mb.user_id === session.user.id)
+  const nameOf = (mb: Member) => (mb.id === me?.id ? 'คุณ' : memberName(mb))
+  const payerErr = checkPayers(payers, grandTotal, cur).error
+
   const save = async (e: FormEvent) => {
     e.preventDefault()
+    if (payerErr) return setShowPayers(true)
     setBusy(true)
     const billId = editing ?? crypto.randomUUID()
-    const row = { ...f, currency: cur, grand_total: grandTotal, group_id: groupId, image_path: imagePath }
+    const row = { ...f, paid_by: mainPayer(payers, f.paid_by), currency: cur, grand_total: grandTotal, group_id: groupId, image_path: imagePath }
     const itemRows = items.map((i, position) => ({ ...i, bill_id: billId, position }))
     try {
       if (blob && !imagePath) {
@@ -116,6 +125,7 @@ export default function NewBill({ session }: { session: Session }) {
         if (r.error) await sb.from('bills').delete().eq('id', billId) // no half-saved bills
         must(r)
       }
+      await savePayers(billId, payers)
       nav(`/b/${billId}`, { replace: true })
     } catch (err) {
       setStatus(`บันทึกไม่สำเร็จ: ${(err as Error).message}`)
@@ -145,9 +155,9 @@ export default function NewBill({ session }: { session: Session }) {
           <label>ชื่อบิล<input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
           <div className="row">
             <label>ใครจ่าย
-              <select required value={f.paid_by} onChange={(e) => setF({ ...f, paid_by: e.target.value })}>
-                {members.map((mb) => <option key={mb.id} value={mb.id}>{memberName(mb)}</option>)}
-              </select>
+              <button type="button" className="pill" aria-expanded={showPayers} onClick={() => setShowPayers(!showPayers)}>
+                {payerLabel(payers, f.paid_by, members, nameOf)} ▾
+              </button>
             </label>
             <label>สกุลเงิน
               <select value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
@@ -155,6 +165,12 @@ export default function NewBill({ session }: { session: Session }) {
               </select>
             </label>
           </div>
+
+          {showPayers && (
+            <PayerPicker members={members} nameOf={nameOf} paidBy={f.paid_by} onPaidBy={(id) => setF({ ...f, paid_by: id })}
+              payers={payers} onPayers={setPayers} total={grandTotal} cur={cur} onDone={() => setShowPayers(false)} />
+          )}
+          {payerErr && !showPayers && <p className="bad">⚠ {payerErr} (แก้ที่ "ใครจ่าย")</p>}
 
           <h2>รายการ</h2>
           {items.map((i) => (

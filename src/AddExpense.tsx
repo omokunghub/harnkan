@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
 import { Avatar } from './Avatar'
+import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers } from './Payers'
 import { detectSplit, fmt, splitWeights, toMinor, type SplitMode } from './money'
 
 const MODES: [SplitMode, string][] = [['equal', 'เท่ากัน'], ['exact', 'กำหนดยอด'], ['percent', 'เปอร์เซ็นต์'], ['shares', 'จำนวนส่วน']]
@@ -59,11 +60,7 @@ export default function AddExpense({ session }: { session: Session }) {
     setMode(m)
     setValues(Object.fromEntries(members.map((mb) => [mb.id, m === 'equal' || m === 'shares' ? 1 : 0])))
   }
-  const multi = Object.keys(payers).length > 0
-  const paidSum = Object.values(payers).reduce((a, v) => a + toMinor(v, cur), 0)
-  const payerErr = multi && paidSum !== toMinor(total, cur)
-    ? `จ่ายรวม ${fmt(paidSum, cur)} จาก ${fmt(toMinor(total, cur), cur)} — เหลือ ${fmt(toMinor(total, cur) - paidSum, cur)}` : ''
-  const payerLabel = multi ? `${Object.keys(payers).length} คน` : nameOf(members.find((m) => m.id === f.paid_by) ?? members[0] ?? ({} as Member))
+  const payerErr = checkPayers(payers, total, cur).error
   const summary = mode === 'equal'
     ? chosen === members.length ? 'เท่ากันทุกคน' : `เท่ากัน ${chosen} คน`
     : MODES.find(([m]) => m === mode)![1]
@@ -75,14 +72,13 @@ export default function AddExpense({ session }: { session: Session }) {
     try {
       const billId = editing ?? crypto.randomUUID()
       const iid = itemId ?? crypto.randomUUID()
-      const paidBy = multi ? Object.entries(payers).sort((a, b) => b[1] - a[1])[0][0] : f.paid_by
+      const paidBy = mainPayer(payers, f.paid_by)
       const row = { group_id: groupId, title: f.title, currency: cur, paid_by: paidBy, spent_on: f.spent_on, grand_total: total,
         service_charge: 0, vat: 0, discount: 0, vat_included: false }
       const shares = Object.entries(weights).map(([member_id, weight]) => ({ item_id: iid, member_id, weight }))
       if (editing) must(await sb.from('bills').update(row).eq('id', billId))
       else must(await sb.from('bills').insert({ ...row, id: billId }))
-      must(await sb.from('bill_payers').delete().eq('bill_id', billId))
-      if (multi) must(await sb.from('bill_payers').insert(Object.entries(payers).map(([member_id, amount]) => ({ bill_id: billId, member_id, amount }))))
+      await savePayers(billId, payers)
       must(await sb.from('bill_items').upsert({ id: iid, bill_id: billId, name: f.title, line_total: total }))
       must(await sb.from('item_shares').upsert(shares))
       must(await sb.from('item_shares').delete().eq('item_id', iid).not('member_id', 'in', `(${Object.keys(weights).join(',')})`))
@@ -111,39 +107,14 @@ export default function AddExpense({ session }: { session: Session }) {
 
         <p className="sentence">
           จ่ายโดย{' '}
-          <button type="button" className="pill" aria-expanded={showPayers} onClick={() => setShowPayers(!showPayers)}>{payerLabel}</button>{' '}
+          <button type="button" className="pill" aria-expanded={showPayers} onClick={() => setShowPayers(!showPayers)}>{payerLabel(payers, f.paid_by, members, nameOf)}</button>{' '}
           หาร{' '}
           <button type="button" className="pill" aria-expanded={showSplit} onClick={() => setShowSplit(!showSplit)}>{summary}</button>
         </p>
 
         {showPayers && (
-          <section className="card stack" aria-label="ใครจ่าย">
-            {!multi ? <>
-              {members.map((m) => (
-                <button key={m.id} type="button" className="list-row" aria-pressed={m.id === f.paid_by}
-                  onClick={() => { setF({ ...f, paid_by: m.id }); setShowPayers(false) }}>
-                  <Avatar member={m} size={36} /><span className="grow">{nameOf(m)}</span>{m.id === f.paid_by && '✓'}
-                </button>
-              ))}
-              <button type="button" className="list-row" onClick={() => setPayers({ [f.paid_by]: total })}>
-                <span className="row-icon" aria-hidden>👥</span>หลายคนช่วยกันจ่าย
-              </button>
-            </> : <>
-              {members.map((m) => (
-                <label key={m.id} className="split-row">
-                  <span className="who"><Avatar member={m} size={36} />{nameOf(m)}</span>
-                  <input type="number" step="any" min="0" inputMode="decimal" className="narrow" placeholder="0.00" aria-label={`${nameOf(m)} จ่าย`}
-                    value={payers[m.id] || ''} onChange={(e) => {
-                      const v = Number(e.target.value), next = { ...payers, [m.id]: v }
-                      if (!v) delete next[m.id]
-                      setPayers(next)
-                    }} />
-                </label>
-              ))}
-              <p className={payerErr ? 'bad' : 'muted'}>{payerErr || `จ่ายรวม ${fmt(paidSum, cur)} ครบแล้ว ✓`}</p>
-              <button type="button" className="ghost" onClick={() => setPayers({})}>กลับไปจ่ายคนเดียว</button>
-            </>}
-          </section>
+          <PayerPicker members={members} nameOf={nameOf} paidBy={f.paid_by} onPaidBy={(id) => setF({ ...f, paid_by: id })}
+            payers={payers} onPayers={setPayers} total={total} cur={cur} onDone={() => setShowPayers(false)} />
         )}
 
         {showSplit && (
