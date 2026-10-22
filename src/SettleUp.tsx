@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import generatePayload from 'promptpay-qr'
 import QRCode from 'qrcode'
+import { FormHeader } from './FormHeader'
 import { active, CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, useSignedUrl, type Member } from './supabase'
 
 // The payee's own QR image (bank app, TrueMoney, foreign wallets). Amount must be typed in their app.
@@ -37,6 +38,7 @@ export default function SettleUp({ session }: { session: Session }) {
   const [f, setF] = useState({ from_member: q.get('from') ?? '', to_member: q.get('to') ?? '', amount: q.get('amount') ?? '', currency: q.get('cur') ?? 'THB' })
   const [slip, setSlip] = useState<File>()
   const [err, setErr] = useState('')
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     sb.from('members').select(MEMBER_COLS).eq('group_id', id).then((r) => {
@@ -65,11 +67,8 @@ export default function SettleUp({ session }: { session: Session }) {
 
   return (
     <main>
-      <header>
-        <Link to={`/g/${id}`}>‹</Link>
-        <h1>บันทึกการโอน</h1>
-      </header>
-      <form onSubmit={save} className="stack">
+      <FormHeader title="บันทึกการโอน" back={`/g/${id}`} formId="settle-form" dirty={dirty} disabled={f.from_member === f.to_member} />
+      <form id="settle-form" onSubmit={save} onChange={() => setDirty(true)} className="stack">
         <label>ใครโอน
           <select required value={f.from_member} onChange={(e) => setF({ ...f, from_member: e.target.value })}>
             {members.map((m) => <option key={m.id} value={m.id}>{memberName(m)}</option>)}
@@ -93,7 +92,6 @@ export default function SettleUp({ session }: { session: Session }) {
         <PaymentQR path={to?.profiles?.payment_qr_path} amountText={f.amount ? `${f.amount} ${f.currency}` : ''} />
         <label>แนบสลิป (ไม่บังคับ)<input type="file" accept="image/*" onChange={(e) => setSlip(e.target.files?.[0])} /></label>
         {f.from_member && f.from_member === f.to_member && <p className="bad">คนโอนกับคนรับเป็นคนเดียวกัน</p>}
-        <button disabled={f.from_member === f.to_member}>บันทึก</button>
         {err && <p className="bad">{err}</p>}
       </form>
     </main>

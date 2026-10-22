@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
 import { Avatar } from './Avatar'
+import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers } from './Payers'
 import { detectSplit, fmt, splitWeights, toMinor, type SplitMode } from './money'
 
@@ -24,6 +25,7 @@ export default function AddExpense({ session }: { session: Session }) {
   const [payers, setPayers] = useState<Record<string, number>>({}) // empty = single payer f.paid_by
   const [showPayers, setShowPayers] = useState(false)
   const [err, setErr] = useState('')
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!editing) return
@@ -90,11 +92,9 @@ export default function AddExpense({ session }: { session: Session }) {
 
   return (
     <main>
-      <header>
-        <Link to={editing ? `/b/${editing}` : `/g/${groupId}`} aria-label="กลับ">‹</Link>
-        <h1>{editing ? 'แก้ค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h1>
-      </header>
-      <form onSubmit={save} className="stack">
+      <FormHeader title={editing ? 'แก้ค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'} back={editing ? `/b/${editing}` : `/g/${groupId}`}
+        formId="expense-form" dirty={dirty} disabled={!groupId || !members.length} />
+      <form id="expense-form" onSubmit={save} onChange={() => setDirty(true)} className="stack">
         <input required className="big-title" placeholder="รายละเอียด เช่น ค่าน้ำมัน" aria-label="รายละเอียด"
           value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         <div className="amount-row">
@@ -152,7 +152,6 @@ export default function AddExpense({ session }: { session: Session }) {
           <input type="date" aria-label="วันที่" value={f.spent_on} onChange={(e) => setF({ ...f, spent_on: e.target.value })} />
           {!editing && <Link className="button ghost" to={`/g/${groupId}/new`}>📷 สแกนใบเสร็จแทน</Link>}
         </div>
-        <button disabled={!groupId || !members.length}>บันทึก</button>
         {err && <p className="bad">{err}</p>}
       </form>
     </main>

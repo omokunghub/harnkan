@@ -160,3 +160,7 @@ header .grow { flex: 1; }
 .camera-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px calc(16px + env(safe-area-inset-bottom)); }
 .camera-bar .ghost { color: #fff; border-color: rgba(255,255,255,.4); width: 80px; }
 .shutter { width: 72px; height: 72px; padding: 0; border-radius: 50%; background: #fff; border: 6px solid rgba(255,255,255,.4); background-clip: padding-box; }
+.form-header { position: sticky; top: 0; z-index: 5; background: var(--bg); margin: -12px -16px 8px; padding: calc(4px + env(safe-area-inset-top)) 8px 4px; border-bottom: 1px solid var(--line); }
+.form-header h1 { font-size: 1.15rem; }
+.save-btn { background: none; color: var(--accent); font-size: 1.6rem; font-weight: 700; }
+.save-btn:disabled { color: var(--muted); }

@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
 import { CropView, cleanBox, type Box } from './Crop'
 import { Camera, canUseCamera } from './Camera'
+import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
 import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
 
@@ -35,6 +36,7 @@ export default function NewBill({ session }: { session: Session }) {
   const [busy, setBusy] = useState(false)
   const [payers, setPayers] = useState<Payers>({})
   const [showPayers, setShowPayers] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [camera, setCamera] = useState(false)
   const [camError, setCamError] = useState('') // in-page camera failed → fall back to the phone's camera app
 
@@ -142,10 +144,8 @@ export default function NewBill({ session }: { session: Session }) {
   const showForm = items.length > 0 || editing
   return (
     <main>
-      <header>
-        <Link to={editing ? `/b/${editing}` : `/g/${groupId}`}>‹</Link>
-        <h1>{editing ? 'แก้บิล' : 'บิลใหม่'}</h1>
-      </header>
+      <FormHeader title={editing ? 'แก้บิล' : 'บิลใหม่'} back={editing ? `/b/${editing}` : `/g/${groupId}`}
+        formId="bill-form" dirty={dirty || !!preview} disabled={busy || !items.length || !groupId} />
 
       {!editing && !q.get('manual') && (
         // `capture` opens the camera straight away; without it the phone shows its gallery/file picker
@@ -170,7 +170,7 @@ export default function NewBill({ session }: { session: Session }) {
       {status && <p className="muted">{status}</p>}
 
       {showForm && (
-        <form onSubmit={save} className="stack">
+        <form id="bill-form" onSubmit={save} onChange={() => setDirty(true)} className="stack">
           <label>ชื่อบิล<input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
           <div className="row">
             <label>ใครจ่าย
