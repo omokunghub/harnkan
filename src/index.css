@@ -149,3 +149,8 @@ header .grow { flex: 1; }
 .details-input { grid-column: 1 / -1; }
 .item-tools { display: flex; gap: 4px; flex: none; }
 .item-tools .icon-btn { width: 40px; height: 40px; font-size: 1.1rem; }
+.crop-stage { overflow: hidden; }
+.angle-row { display: flex; align-items: center; gap: 8px; color: #fff; font-size: .95rem; }
+.angle-row input { flex: 1; min-height: 32px; padding: 0; }
+.angle-row button { flex: none; color: #fff; border-color: rgba(255,255,255,.4); }
+.crop-grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.18) 1px, transparent 1px); background-size: 100% 24px; }

@@ -199,3 +199,13 @@ test('item details and crop box: validated, details edits logged, crop moves not
   expect(log).toHaveLength(1)
   expect(Object.keys(log[0].detail.changes)).toEqual(['details'])
 })
+
+test('crop angle limited to ±45°', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'x', 1) returning id`, [g, mA])
+  const [{ id: item }] = await as(A, `insert into bill_items (bill_id, name, line_total) values ($1, 'x', 1) returning id`, [bill])
+  await as(A, `update bill_items set crop_angle = -12.5 where id = $1`, [item])
+  await expect(as(A, `update bill_items set crop_angle = 90 where id = $1`, [item])).rejects.toThrow()
+})

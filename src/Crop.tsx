@@ -14,25 +14,27 @@ export function cleanBox(b: unknown, pad = 8): Box | null {
   return box[2] - box[0] >= 5 && box[3] - box[1] >= 5 ? box : null
 }
 
-// Shows just the boxed part of the photo.
-export function CropView({ src, box }: { src: string; box: Box }) {
+// Shows just the boxed part of the photo, turned `angle`° around its centre first (for tilted receipts).
+// The box is measured on that turned photo, so editor and view rotate the same way.
+export function CropView({ src, box, angle = 0 }: { src: string; box: Box; angle?: number }) {
   const [ratio, setRatio] = useState<number>() // photo width / height
   const [y0, x0, y1, x1] = box.map((v) => v / 1000)
   const w = x1 - x0, h = y1 - y0
   return (
     <div className="crop-view" style={{ aspectRatio: ratio ? `${w * ratio} / ${h}` : '6 / 1' }}>
       <img src={src} alt="" onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
-        style={{ width: `${100 / w}%`, left: `${(-x0 / w) * 100}%`, top: `${(-y0 / h) * 100}%` }} />
+        style={{ width: `${100 / w}%`, left: `${(-x0 / w) * 100}%`, top: `${(-y0 / h) * 100}%`, transform: `rotate(${angle}deg)` }} />
     </div>
   )
 }
 
 // Full photo; drag a rectangle to set the line's box.
-export function CropEditor({ src, box, onSave, onClose }: {
-  src: string; box: Box | null; onSave: (b: Box | null) => void; onClose: () => void
+export function CropEditor({ src, box, angle: angle0 = 0, onSave, onClose }: {
+  src: string; box: Box | null; angle?: number; onSave: (b: Box | null, angle: number) => void; onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useState<Box | null>(box)
+  const [angle, setAngle] = useState(angle0)
   const [start, setStart] = useState<[number, number]>()
   const at = (e: PointerEvent) => {
     const r = ref.current!.getBoundingClientRect()
@@ -45,19 +47,26 @@ export function CropEditor({ src, box, onSave, onClose }: {
   }
   return (
     <div className="crop-modal" role="dialog" aria-modal aria-label="ลากกรอบรอบบรรทัดนี้">
-      <p>ลากนิ้วเป็นกรอบรอบบรรทัดของรายการนี้</p>
+      <div className="stack">
+        <p>1) หมุนให้บรรทัดตรง 2) ลากนิ้วเป็นกรอบรอบชื่อและราคา</p>
+        <label className="angle-row">เอียง {angle > 0 ? '+' : ''}{angle}°
+          <input type="range" min={-30} max={30} step={0.5} value={angle} onChange={(e) => setAngle(Number(e.target.value))} />
+          <button type="button" className="ghost" onClick={() => setAngle(0)} aria-label="รีเซ็ตมุม">↺</button>
+        </label>
+      </div>
       <div ref={ref} className="crop-stage"
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setStart(at(e)); setDraft(null) }}
         onPointerMove={move} onPointerUp={(e) => { move(e); setStart(undefined) }}>
-        <img src={src} alt="ใบเสร็จ" draggable={false} />
+        <img src={src} alt="ใบเสร็จ" draggable={false} style={{ transform: `rotate(${angle}deg)` }} />
+        <div className="crop-grid" aria-hidden />
         {draft && <div className="crop-rect" style={{
           top: `${draft[0] / 10}%`, left: `${draft[1] / 10}%`, height: `${(draft[2] - draft[0]) / 10}%`, width: `${(draft[3] - draft[1]) / 10}%`,
         }} />}
       </div>
       <div className="row">
         <button type="button" className="ghost" onClick={onClose}>ยกเลิก</button>
-        {box && <button type="button" className="ghost" onClick={() => onSave(null)}>ลบกรอบ</button>}
-        <button type="button" disabled={!draft} onClick={() => onSave(draft)}>บันทึก</button>
+        {box && <button type="button" className="ghost" onClick={() => onSave(null, 0)}>ลบกรอบ</button>}
+        <button type="button" disabled={!draft} onClick={() => onSave(draft, angle)}>บันทึก</button>
       </div>
     </div>
   )

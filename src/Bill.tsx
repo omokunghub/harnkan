@@ -8,7 +8,7 @@ import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { CropEditor, CropView, type Box } from './Crop'
 
-type ItemRow = Item & { id: string; name: string; name_translated: string | null; position: number; details: string | null; crop: Box | null }
+type ItemRow = Item & { id: string; name: string; name_translated: string | null; position: number; details: string | null; crop: Box | null; crop_angle: number }
 type BillRow = Omit<Bill, 'bill_items'> & { id: string; group_id: string; title: string; image_path: string | null; bill_items: ItemRow[] }
 type Comment = { id: string; member_id: string; body: string; created_at: string }
 
@@ -84,8 +84,8 @@ export default function BillPage({ session }: { session: Session }) {
     must(await sb.from('bill_items').update({ name: draft.name.trim(), details: draft.details.trim() || null, line_total: Number(draft.line_total) }).eq('id', draft.id))
     setDraft(undefined); load()
   }
-  const saveCrop = async (crop: Box | null) => {
-    must(await sb.from('bill_items').update({ crop }).eq('id', cropFor!.id))
+  const saveCrop = async (crop: Box | null, crop_angle: number) => {
+    must(await sb.from('bill_items').update({ crop, crop_angle }).eq('id', cropFor!.id))
     setCropFor(undefined); load()
   }
   const warnings = simple ? [] : checkReceipt(bill)
@@ -142,7 +142,7 @@ export default function BillPage({ session }: { session: Session }) {
                 {img && <button className="icon-btn" aria-label={`ตัดภาพบรรทัด ${i.name}`} onClick={() => setCropFor(i)}>✂️</button>}
               </span>
             </div>
-            {img && i.crop && <CropView src={img} box={i.crop} />}
+            {img && i.crop && <CropView src={img} box={i.crop} angle={i.crop_angle} />}
             {draft?.id === i.id && (
               <form onSubmit={saveItem} className="item-edit-inline">
                 <input required aria-label="ชื่อรายการ" maxLength={200} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
@@ -181,7 +181,7 @@ export default function BillPage({ session }: { session: Session }) {
       </div>
       </>}
 
-      {cropFor && img && <CropEditor src={img} box={cropFor.crop} onSave={saveCrop} onClose={() => setCropFor(undefined)} />}
+      {cropFor && img && <CropEditor src={img} box={cropFor.crop} angle={cropFor.crop_angle} onSave={saveCrop} onClose={() => setCropFor(undefined)} />}
 
       <h2>แต่ละคนจ่าย</h2>
       <div className="table-wrap">
