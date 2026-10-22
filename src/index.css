@@ -136,3 +136,4 @@ header .grow { flex: 1; }
 .fx-note { font-size: .8rem; margin: 4px 0 8px; }
 .list-row .grow { flex: 1; text-align: left; }
 .tabs { align-items: center; }
+.grow-btn { flex: 1; }

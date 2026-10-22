@@ -142,11 +142,17 @@ export default function NewBill({ session }: { session: Session }) {
       </header>
 
       {!editing && !q.get('manual') && (
-        // no `capture`: the phone then asks camera or gallery (capture would force the camera on Android)
-        <label className="button">
-          📷 ถ่ายรูป / เลือกรูปใบเสร็จ
-          <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
-        </label>
+        // `capture` opens the camera straight away; without it the phone shows its gallery/file picker
+        <div className="row">
+          <label className="button grow-btn">
+            📷 ถ่ายรูป
+            <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
+          <label className="button ghost grow-btn">
+            🖼️ เลือกจากเครื่อง
+            <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
+        </div>
       )}
       {preview && <img className="receipt" src={preview} alt="ใบเสร็จ" />}
       {status && <p className="muted">{status}</p>}
