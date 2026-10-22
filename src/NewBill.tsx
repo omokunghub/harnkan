@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
 import { CropView, cleanBox, type Box } from './Crop'
+import { Camera, canUseCamera } from './Camera'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
 import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
 
@@ -34,6 +35,8 @@ export default function NewBill({ session }: { session: Session }) {
   const [busy, setBusy] = useState(false)
   const [payers, setPayers] = useState<Payers>({})
   const [showPayers, setShowPayers] = useState(false)
+  const [camera, setCamera] = useState(false)
+  const [camError, setCamError] = useState('') // in-page camera failed → fall back to the phone's camera app
 
   useEffect(() => {
     if (!editing) return
@@ -147,16 +150,22 @@ export default function NewBill({ session }: { session: Session }) {
       {!editing && !q.get('manual') && (
         // `capture` opens the camera straight away; without it the phone shows its gallery/file picker
         <div className="row">
-          <label className="button grow-btn">
-            📷 ถ่ายรูป
-            <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
-          </label>
+          {canUseCamera() && !camError ? (
+            <button type="button" className="grow-btn" disabled={busy} onClick={() => setCamera(true)}>📷 ถ่ายรูป</button>
+          ) : (
+            <label className="button grow-btn">
+              📷 ถ่ายรูป
+              <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
+            </label>
+          )}
           <label className="button ghost grow-btn">
             🖼️ เลือกจากเครื่อง
             <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
           </label>
         </div>
       )}
+      {camera && <Camera onShot={(f) => { setCamera(false); scan(f) }} onClose={(err) => { setCamera(false); if (err) setCamError(err) }} />}
+      {camError && <p className="muted">{camError} — ปุ่มถ่ายรูปจะเปิดแอปกล้องของเครื่องแทน</p>}
       {preview && <img className="receipt" src={preview} alt="ใบเสร็จ" />}
       {status && <p className="muted">{status}</p>}
 
