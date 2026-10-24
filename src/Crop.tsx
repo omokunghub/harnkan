@@ -14,6 +14,13 @@ export function cleanBox(b: unknown, pad = 8): Box | null {
   return box[2] - box[0] >= 5 && box[3] - box[1] >= 5 ? box : null
 }
 
+// Long receipts: photos stacked top-to-bottom at one width, all scaled down together if the stack gets too tall.
+export function stackLayout(sizes: [number, number][], width = 1200, maxHeight = 6000) {
+  const heights = sizes.map(([w, h]) => (h * width) / w)
+  const k = Math.min(1, maxHeight / heights.reduce((a, b) => a + b, 0))
+  return { width: Math.round(width * k), heights: heights.map((h) => Math.round(h * k)) }
+}
+
 // Shows just the boxed part of the photo, turned `angle`° around its centre first (for tilted receipts).
 // The box is measured on that turned photo, so editor and view rotate the same way.
 export function CropView({ src, box, angle = 0 }: { src: string; box: Box; angle?: number }) {

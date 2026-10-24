@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, shrink } from './supabase'
+import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, stitch } from './supabase'
 import { CropView, cleanBox, type Box } from './Crop'
 import { Camera, canUseCamera } from './Camera'
 import { FormHeader } from './FormHeader'
@@ -31,6 +31,7 @@ export default function NewBill({ session }: { session: Session }) {
   const [printedSubtotal, setPrintedSubtotal] = useState<number | null>(null)
   const [blob, setBlob] = useState<Blob>()
   const [preview, setPreview] = useState<string>()
+  const [photos, setPhotos] = useState<{ file: File; url: string }[]>([]) // several = one long receipt, top to bottom
   const [imagePath, setImagePath] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
@@ -60,11 +61,13 @@ export default function NewBill({ session }: { session: Session }) {
     })
   }, [groupId, session.user.id])
 
-  const scan = async (file?: File) => {
-    if (!file) return
-    setBusy(true); setStatus('กำลังอ่านใบเสร็จ…')
+  const addPhotos = (files: FileList | File[] | null | undefined) =>
+    files?.length && setPhotos((p) => [...p, ...[...files].map((file) => ({ file, url: URL.createObjectURL(file) }))])
+  const scan = async () => {
+    if (!photos.length) return
+    setBusy(true); setStatus(photos.length > 1 ? `กำลังต่อ ${photos.length} รูปแล้วอ่านใบเสร็จ…` : 'กำลังอ่านใบเสร็จ…')
     try {
-      const b = await shrink(file)
+      const b = await stitch(photos.map((p) => p.file))
       setBlob(b); setPreview(URL.createObjectURL(b))
       const { data: d, error } = await sb.functions.invoke('scan-receipt', { body: { image: await toBase64(b), lang: 'Thai' } })
       if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message)
@@ -155,16 +158,32 @@ export default function NewBill({ session }: { session: Session }) {
           ) : (
             <label className="button grow-btn">
               📷 ถ่ายรูป
-              <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
+              <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { addPhotos(e.target.files); e.target.value = '' }} />
             </label>
           )}
           <label className="button ghost grow-btn">
             🖼️ เลือกจากเครื่อง
-            <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { scan(e.target.files?.[0]); e.target.value = '' }} />
+            <input hidden type="file" accept="image/*" multiple disabled={busy} onChange={(e) => { addPhotos(e.target.files); e.target.value = '' }} />
           </label>
         </div>
       )}
-      {camera && <Camera onShot={(f) => { setCamera(false); scan(f) }} onClose={(err) => { setCamera(false); if (err) setCamError(err) }} />}
+      {photos.length > 0 && (
+        <section className="stack">
+          <div className="photo-strip">
+            {photos.map((p, i) => (
+              <figure key={p.url}>
+                <img src={p.url} alt={`รูปที่ ${i + 1}`} />
+                <figcaption>{i + 1}</figcaption>
+                <button type="button" className="round" aria-label={`ลบรูปที่ ${i + 1}`} disabled={busy}
+                  onClick={() => setPhotos(photos.filter((x) => x !== p))}>✕</button>
+              </figure>
+            ))}
+          </div>
+          <p className="muted">ใบเสร็จยาว? ถ่ายหรือเลือกรูปส่วนต่อเพิ่มได้ เรียงจากบนลงล่าง (ซ้อนกันนิดหน่อยได้ AI จะไม่นับซ้ำ)</p>
+          <button type="button" disabled={busy} onClick={scan}>🔍 อ่านใบเสร็จ{photos.length > 1 ? ` (${photos.length} รูป)` : ''}</button>
+        </section>
+      )}
+      {camera && <Camera onShot={(f) => { setCamera(false); addPhotos([f]) }} onClose={(err) => { setCamera(false); if (err) setCamError(err) }} />}
       {camError && <p className="muted">{camError} — ปุ่มถ่ายรูปจะเปิดแอปกล้องของเครื่องแทน</p>}
       {preview && <img className="receipt" src={preview} alt="ใบเสร็จ" />}
       {status && <p className="muted">{status}</p>}

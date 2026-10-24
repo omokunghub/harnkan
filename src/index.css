@@ -164,3 +164,8 @@ header .grow { flex: 1; }
 .form-header h1 { font-size: 1.15rem; }
 .save-btn { background: none; color: var(--accent); font-size: 1.6rem; font-weight: 700; }
 .save-btn:disabled { color: var(--muted); }
+.photo-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
+.photo-strip figure { position: relative; margin: 0; flex: none; }
+.photo-strip img { width: 84px; height: 112px; object-fit: cover; border-radius: 8px; display: block; }
+.photo-strip figcaption { position: absolute; left: 6px; bottom: 4px; color: #fff; font-weight: 700; text-shadow: 0 1px 3px #000; }
+.photo-strip .round { position: absolute; top: 2px; right: 2px; width: 28px; height: 28px; font-size: .8rem; min-height: 0; }

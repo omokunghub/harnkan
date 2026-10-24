@@ -1,5 +1,6 @@
 import { createClient, type Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
+import { stackLayout } from './Crop'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
 
@@ -44,6 +45,18 @@ export async function shrink(file: File, max = 1600): Promise<Blob> {
   const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * s), height: Math.round(img.height * s) })
   c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
   return new Promise((res) => c.toBlob((b) => res(b!), 'image/jpeg', 0.8))
+}
+
+// One image for the AI and for line crops, whether the receipt took one photo or several.
+export async function stitch(files: File[]): Promise<Blob> {
+  if (files.length === 1) return shrink(files[0])
+  const imgs = await Promise.all(files.map((f) => createImageBitmap(f)))
+  const { width, heights } = stackLayout(imgs.map((i) => [i.width, i.height]))
+  const c = Object.assign(document.createElement('canvas'), { width, height: heights.reduce((a, b) => a + b, 0) })
+  const ctx = c.getContext('2d')!
+  let y = 0
+  imgs.forEach((img, i) => { ctx.drawImage(img, 0, y, width, heights[i]); y += heights[i] })
+  return new Promise((res) => c.toBlob((b) => res(b!), 'image/jpeg', 0.85))
 }
 
 // Throw on Supabase errors so callers can't silently ignore them.

@@ -40,6 +40,7 @@ const schema = {
   required: ['currency', 'items', 'grand_total'],
 }
 const prompt = (lang: string) => `Extract this receipt.
+- The image may be several photos of ONE long receipt stacked top to bottom, possibly overlapping: read it as one receipt and never count a line twice.
 - Copy numbers exactly as printed. Never calculate a value that is not printed; use null instead.
 - items: one entry per line that has its own printed price; line_total is that printed amount (qty × unit price). Do not include subtotal, service charge, tax, discount or total lines as items.
 - Lines without their own price (add-ons, options, set/combo components such as "Addon - None", "2 COB", "PEPSI 340 ML") are NOT items: put them, comma-separated, in "details" of the priced item they belong to (usually the priced line just above them; a set name is followed by its components).

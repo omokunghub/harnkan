@@ -123,3 +123,10 @@ test('crop boxes from the AI are cleaned up', async () => {
   expect(cleanBox('nope')).toBeNull()
   expect(cleanBox([1, 2, 3])).toBeNull()
 })
+
+test('long receipt photos stack at one width and shrink together when too tall', async () => {
+  const { stackLayout } = await import('./Crop')
+  expect(stackLayout([[3000, 4000], [1500, 2000]])).toEqual({ width: 1200, heights: [1600, 1600] })
+  const tall = stackLayout([[1200, 4000], [1200, 4000]]) // 8000 > 6000 → ×0.75
+  expect(tall).toEqual({ width: 900, heights: [3000, 3000] })
+})
