@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { ArrowLeft, Pencil, Scissors, Square, SquareCheck, TriangleAlert, Users } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
@@ -99,7 +100,7 @@ export default function BillPage({ session }: { session: Session }) {
   return (
     <main>
       <header>
-        <Link to={`/g/${bill.group_id}`}>‹</Link>
+        <Link to={`/g/${bill.group_id}`} className="icon-btn" aria-label="กลับ"><ArrowLeft size={24} /></Link>
         <h1>{bill.title}</h1>
         <Link to={simple ? `/b/${id}/expense` : `/b/${id}/edit`}>แก้</Link>
       </header>
@@ -119,8 +120,8 @@ export default function BillPage({ session }: { session: Session }) {
           </button>
         ))}
       </div>
-      <p className="muted">เลือกคนด้านบน แล้วแตะรายการที่เป็นของคนนั้น · 👥 หารหลายคน · ✏️ แก้รายการ{img ? ' · ✂️ ตัดภาพบรรทัด' : ''}</p>
-      {warnings.map((w) => <p key={w} className="bad">⚠ {w}</p>)}
+      <p className="muted">เลือกคนด้านบน แล้วแตะรายการที่เป็นของคนนั้น · <Users size={14} aria-label="ปุ่มคน" /> หารหลายคน · <Pencil size={14} aria-label="ปุ่มดินสอ" /> แก้รายการ{img && <> · <Scissors size={14} aria-label="ปุ่มกรรไกร" /> ตัดภาพบรรทัด</>}</p>
+      {warnings.map((w) => <p key={w} className="bad"><TriangleAlert size={16} aria-hidden /> {w}</p>)}
 
       {bill.bill_items.map((i) => {
         const ticked = i.item_shares.some((s) => s.member_id === who)
@@ -128,18 +129,18 @@ export default function BillPage({ session }: { session: Session }) {
           <div key={i.id} className={`card item ${ticked ? 'mine' : ''} ${i.item_shares.length ? '' : 'unclaimed'}`}>
             <div className="row">
               <button className="item-main" aria-pressed={ticked} onClick={() => toggle(i)}>
-                <span>{ticked ? '☑' : '☐'} {i.name}{i.name_translated && i.name_translated !== i.name && <small className="muted"> · {i.name_translated}</small>}
+                <span><span className="tick" aria-hidden>{ticked ? <SquareCheck size={20} /> : <Square size={20} />}</span>{i.name}{i.name_translated && i.name_translated !== i.name && <small className="muted"> · {i.name_translated}</small>}
                   {i.details && <small className="muted item-details">+ {i.details}</small>}</span>
                 <span>{fmt(toMinor(i.line_total, cur), cur)}</span>
               </button>
-              <button className="ghost" aria-label="เลือกคนหาร" aria-expanded={open === i.id} onClick={() => setOpen(open === i.id ? undefined : i.id)}>👥</button>
+              <button className="ghost" aria-label="เลือกคนหาร" aria-expanded={open === i.id} onClick={() => setOpen(open === i.id ? undefined : i.id)}><Users size={20} /></button>
             </div>
             <div className="row">
               <small className="muted">{i.item_shares.map((s) => name(s.member_id) + (s.weight > 1 ? ` ×${s.weight}` : '')).join(', ')}</small>
               <span className="item-tools">
                 <button className="icon-btn" aria-label={`แก้รายการ ${i.name}`}
-                  onClick={() => setDraft(draft?.id === i.id ? undefined : { id: i.id, name: i.name, details: i.details ?? '', line_total: String(i.line_total) })}>✏️</button>
-                {img && <button className="icon-btn" aria-label={`ตัดภาพบรรทัด ${i.name}`} onClick={() => setCropFor(i)}>✂️</button>}
+                  onClick={() => setDraft(draft?.id === i.id ? undefined : { id: i.id, name: i.name, details: i.details ?? '', line_total: String(i.line_total) })}><Pencil size={18} /></button>
+                {img && <button className="icon-btn" aria-label={`ตัดภาพบรรทัด ${i.name}`} onClick={() => setCropFor(i)}><Scissors size={18} /></button>}
               </span>
             </div>
             {img && i.crop && <CropView src={img} box={i.crop} angle={i.crop_angle} />}

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowLeft, CircleCheck } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { BILL_COLS, must, sb, shrink, useSession } from './supabase'
@@ -90,7 +91,7 @@ function Groups({ session }: { session: Session }) {
         <h1>หารกัน</h1>
         <Link to="/me" aria-label="ตั้งค่าบัญชี"><Avatar url={me?.avatar_url} name={me?.display_name ?? '?'} size={36} /></Link>
       </header>
-      <p className="status">{all.length ? groups.length + ' กลุ่ม' : '🎉 คุณเคลียร์หมดทุกกลุ่มแล้ว'}</p>
+      <p className="status">{all.length ? groups.length + ' กลุ่ม' : <span className="good"><CircleCheck size={20} aria-hidden /> คุณเคลียร์หมดทุกกลุ่มแล้ว</span>}</p>
       {groups.map((g) => (
         <Link key={g.id} className="line group-line" to={`/g/${g.id}`}>
           <GroupIcon group={g} size={56} />
@@ -178,7 +179,7 @@ function Profile({ session }: { session: Session }) {
   return (
     <main>
       <header>
-        <Link to="/" aria-label="กลับ">‹</Link>
+        <Link to="/" className="icon-btn" aria-label="กลับ"><ArrowLeft size={24} /></Link>
         <h1>ตั้งค่าบัญชี</h1>
       </header>
       <div className="profile-pic">

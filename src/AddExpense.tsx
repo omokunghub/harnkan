@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ScanText } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
@@ -150,7 +151,7 @@ export default function AddExpense({ session }: { session: Session }) {
 
         <div className="row">
           <input type="date" aria-label="วันที่" value={f.spent_on} onChange={(e) => setF({ ...f, spent_on: e.target.value })} />
-          {!editing && <Link className="button ghost" to={`/g/${groupId}/new`}>📷 สแกนใบเสร็จแทน</Link>}
+          {!editing && <Link className="button ghost" to={`/g/${groupId}/new`}><ScanText size={20} aria-hidden /> สแกนใบเสร็จแทน</Link>}
         </div>
         {err && <p className="bad">{err}</p>}
       </form>

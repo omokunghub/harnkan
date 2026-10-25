@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, CalendarDays, CircleCheck, NotebookPen, Plus, ReceiptText, Settings, Users } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSignedUrl, type Member } from './supabase'
-import { GROUP_TYPES, tripDates, type Group } from './GroupSettings'
+import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { allocate, balances, convertNet, fmt, paidBy, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
 
@@ -70,19 +71,22 @@ export default function GroupPage({ session }: { session: Session }) {
       <section className={`hero ${group.cover_url ? 'has-cover' : ''}`}
         style={group.cover_url ? { backgroundImage: `linear-gradient(transparent 30%, rgba(0,0,0,.65)), url("${group.cover_url}")` } : undefined}>
         <div className="hero-bar">
-          <Link to="/" className="round" aria-label="กลับ">←</Link>
-          <Link to={`/g/${id}/settings`} className="round" aria-label="ตั้งค่ากลุ่ม">⚙️</Link>
+          <Link to="/" className="round" aria-label="กลับ"><ArrowLeft size={22} /></Link>
+          <Link to={`/g/${id}/settings`} className="round" aria-label="ตั้งค่ากลุ่ม"><Settings size={22} /></Link>
         </div>
-        <h1 className="group-title">{group.cover_url ? '' : (GROUP_TYPES[group.type] ?? GROUP_TYPES.other)[0] + ' '}{group.name}</h1>
+        <h1 className="group-title">{!group.cover_url && <span className="title-icon"><TypeIcon type={group.type} size={26} /></span>}{group.name}</h1>
         <div className="tabs">
-          {group.type === 'trip' && <Link className="hero-pill" to={`/g/${id}/edit`}>📅 {tripDates(group) || 'ใส่วันที่ทริป'}</Link>}
-          <Link className="hero-pill" to={`/g/${id}/settings`}>👥 {active(members).length} คน</Link>
+          {group.type === 'trip' && <Link className="hero-pill" to={`/g/${id}/edit`}><CalendarDays size={18} aria-hidden /> {tripDates(group) || 'ใส่วันที่ทริป'}</Link>}
+          <Link className="hero-pill" to={`/g/${id}/settings`}><Users size={18} aria-hidden /> {active(members).length} คน</Link>
         </div>
       </section>
 
       <p className="status">
-        {myNet.length === 0 ? '🎉 เคลียร์หมดแล้วในกลุ่มนี้' : myNet.map(([cur, v]) => (
-          <span key={cur} className={v > 0 ? 'good' : 'owe'}>{v > 0 ? 'คุณได้คืน' : 'คุณติดอยู่'} {approx}{fmt(Math.abs(v), cur)} </span>
+        {myNet.length === 0 ? <span className="good"><CircleCheck size={20} aria-hidden /> เคลียร์หมดแล้วในกลุ่มนี้</span> : myNet.map(([cur, v]) => (
+          <span key={cur} className={v > 0 ? 'good' : 'owe'}>
+            {v > 0 ? <ArrowDownLeft size={20} aria-hidden /> : <ArrowUpRight size={20} aria-hidden />}
+            {v > 0 ? 'คุณได้คืน' : 'คุณติดอยู่'} {approx}{fmt(Math.abs(v), cur)}
+          </span>
         ))}
       </p>
       {curOptions.length > 1 && (
@@ -125,7 +129,7 @@ export default function GroupPage({ session }: { session: Session }) {
 
       <ActivityLog entries={log} members={members} title="ความเคลื่อนไหวล่าสุด" />
 
-      <Link className="button fab" to={`/g/${id}/add`}>🧾 เพิ่มค่าใช้จ่าย</Link>
+      <Link className="button fab" to={`/g/${id}/add`}><Plus size={22} aria-hidden /> เพิ่มค่าใช้จ่าย</Link>
     </main>
   )
 }
@@ -153,7 +157,7 @@ function BillLine({ bill, me, name, toView, view }: {
   return (
     <Link className="line" to={`/b/${bill.id}`}>
       <DateBox date={bill.spent_on} />
-      <span className="icon" aria-hidden>{bill.image_path ? '🧾' : '📝'}</span>
+      <span className="icon" aria-hidden>{bill.image_path ? <ReceiptText size={22} /> : <NotebookPen size={22} />}</span>
       <span className="grow">
         <b>{bill.title}</b>
         <small className="muted">{payers.length > 1 ? `${payers.length} คนจ่าย` : `${name(bill.paid_by)} จ่าย`} {fmt(total, cur)}{est != null && ` (≈ ${fmt(est, view)})`}</small>
@@ -172,7 +176,7 @@ function SettleLine({ s, name }: { s: SettlementRow; name: (id: string) => strin
   return (
     <div className="line">
       <DateBox date={s.created_at} />
-      <span className="icon" aria-hidden>💵</span>
+      <span className="icon" aria-hidden><Banknote size={22} /></span>
       <span className="grow">{name(s.from_member)} โอนให้ {name(s.to_member)} {fmt(toMinor(s.amount, s.currency), s.currency)}</span>
       {slip && <a className="right" href={slip} target="_blank">สลิป</a>}
     </div>

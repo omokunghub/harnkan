@@ -1,4 +1,5 @@
 import { must, sb, type Member } from './supabase'
+import { Check, Users } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { fmt, toMinor } from './money'
 
@@ -41,11 +42,11 @@ export function PayerPicker({ members, nameOf, paidBy, onPaidBy, payers, onPayer
       {!multi ? <>
         {members.map((m) => (
           <button key={m.id} type="button" className="list-row" aria-pressed={m.id === paidBy} onClick={() => { onPaidBy(m.id); onDone() }}>
-            <Avatar member={m} size={36} /><span className="grow">{nameOf(m)}</span>{m.id === paidBy && '✓'}
+            <Avatar member={m} size={36} /><span className="grow">{nameOf(m)}</span>{m.id === paidBy && <Check size={20} className="good" aria-label="เลือกอยู่" />}
           </button>
         ))}
         <button type="button" className="list-row" onClick={() => onPayers({ [paidBy || members[0]?.id]: total })}>
-          <span className="row-icon" aria-hidden>👥</span>หลายคนช่วยกันจ่าย
+          <span className="row-icon" aria-hidden><Users size={24} /></span>หลายคนช่วยกันจ่าย
         </button>
       </> : <>
         {members.map((m) => (

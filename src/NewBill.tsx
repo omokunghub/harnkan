@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Camera as CameraIcon, Images, ScanText, TriangleAlert, X } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, type Member, MEMBER_COLS, memberName, must, sb, stitch } from './supabase'
@@ -154,15 +155,15 @@ export default function NewBill({ session }: { session: Session }) {
         // `capture` opens the camera straight away; without it the phone shows its gallery/file picker
         <div className="row">
           {canUseCamera() && !camError ? (
-            <button type="button" className="grow-btn" disabled={busy} onClick={() => setCamera(true)}>📷 ถ่ายรูป</button>
+            <button type="button" className="grow-btn" disabled={busy} onClick={() => setCamera(true)}><CameraIcon size={20} aria-hidden /> ถ่ายรูป</button>
           ) : (
             <label className="button grow-btn">
-              📷 ถ่ายรูป
+              <CameraIcon size={20} aria-hidden /> ถ่ายรูป
               <input hidden type="file" accept="image/*" capture="environment" disabled={busy} onChange={(e) => { addPhotos(e.target.files); e.target.value = '' }} />
             </label>
           )}
           <label className="button ghost grow-btn">
-            🖼️ เลือกจากเครื่อง
+            <Images size={20} aria-hidden /> เลือกจากเครื่อง
             <input hidden type="file" accept="image/*" multiple disabled={busy} onChange={(e) => { addPhotos(e.target.files); e.target.value = '' }} />
           </label>
         </div>
@@ -175,12 +176,12 @@ export default function NewBill({ session }: { session: Session }) {
                 <img src={p.url} alt={`รูปที่ ${i + 1}`} />
                 <figcaption>{i + 1}</figcaption>
                 <button type="button" className="round" aria-label={`ลบรูปที่ ${i + 1}`} disabled={busy}
-                  onClick={() => setPhotos(photos.filter((x) => x !== p))}>✕</button>
+                  onClick={() => setPhotos(photos.filter((x) => x !== p))}><X size={16} /></button>
               </figure>
             ))}
           </div>
           <p className="muted">ใบเสร็จยาว? ถ่ายหรือเลือกรูปส่วนต่อเพิ่มได้ เรียงจากบนลงล่าง (ซ้อนกันนิดหน่อยได้ AI จะไม่นับซ้ำ)</p>
-          <button type="button" disabled={busy} onClick={scan}>🔍 อ่านใบเสร็จ{photos.length > 1 ? ` (${photos.length} รูป)` : ''}</button>
+          <button type="button" disabled={busy} onClick={scan}><ScanText size={20} aria-hidden /> อ่านใบเสร็จ{photos.length > 1 ? ` (${photos.length} รูป)` : ''}</button>
         </section>
       )}
       {camera && <Camera onShot={(f) => { setCamera(false); addPhotos([f]) }} onClose={(err) => { setCamera(false); if (err) setCamError(err) }} />}
@@ -208,14 +209,14 @@ export default function NewBill({ session }: { session: Session }) {
             <PayerPicker members={members} nameOf={nameOf} paidBy={f.paid_by} onPaidBy={(id) => setF({ ...f, paid_by: id })}
               payers={payers} onPayers={setPayers} total={grandTotal} cur={cur} onDone={() => setShowPayers(false)} />
           )}
-          {payerErr && !showPayers && <p className="bad">⚠ {payerErr} (แก้ที่ "ใครจ่าย")</p>}
+          {payerErr && !showPayers && <p className="bad"><TriangleAlert size={16} aria-hidden /> {payerErr} (แก้ที่ "ใครจ่าย")</p>}
 
           <h2>รายการ</h2>
           {items.map((i) => (
             <div key={i.id} className="item-edit">
               <input required aria-label="ชื่อรายการ" value={i.name} onChange={(e) => setItem(i.id, { name: e.target.value })} />
               <input aria-label="ราคา" type="number" step="any" min="0" required value={i.line_total} onChange={(e) => setItem(i.id, { line_total: Number(e.target.value) })} />
-              <button type="button" className="ghost" aria-label="ลบรายการ" onClick={() => setItems(items.filter((x) => x.id !== i.id))}>✕</button>
+              <button type="button" className="ghost" aria-label="ลบรายการ" onClick={() => setItems(items.filter((x) => x.id !== i.id))}><X size={18} /></button>
               {i.name_translated && i.name_translated !== i.name && <small className="muted">{i.name_translated}</small>}
               <input className="details-input" aria-label="รายละเอียด / add-on" placeholder="รายละเอียด / add-on (ถ้ามี)" maxLength={500}
                 value={i.details} onChange={(e) => setItem(i.id, { details: e.target.value })} />
@@ -240,7 +241,7 @@ export default function NewBill({ session }: { session: Session }) {
             {f.vat_included ? ` (มี VAT ${m(f.vat)} รวมอยู่แล้ว)` : ` + VAT ${m(f.vat)}${pct(f.vat, itemsTotal + Number(f.service_charge))}`}
             {f.discount ? ` − ส่วนลด ${m(f.discount)}` : ''} = <b>{m(grandTotal)}</b>
           </p>
-          {warnings.map((w) => <p key={w} className="bad">⚠ {w}</p>)}
+          {warnings.map((w) => <p key={w} className="bad"><TriangleAlert size={16} aria-hidden /> {w}</p>)}
           <button disabled={busy || !items.length || !groupId}>{editing ? 'บันทึก' : 'โพสต์บิล แล้วไปติ๊กรายการ'}</button>
         </form>
       )}

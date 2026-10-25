@@ -1,7 +1,9 @@
 // Runs every migration in an in-memory Postgres with minimal Supabase stubs, then checks RLS and the activity log.
 import { PGlite } from '@electric-sql/pglite'
 import { readdirSync, readFileSync } from 'node:fs'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+
+vi.setConfig({ testTimeout: 30_000 }) // every test replays all migrations in PGlite
 
 const A = '00000000-0000-0000-0000-00000000000a', B = '00000000-0000-0000-0000-00000000000b', C = '00000000-0000-0000-0000-00000000000c'
 

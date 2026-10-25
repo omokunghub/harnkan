@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react'
+import { RotateCcw } from 'lucide-react'
 
 // A crop box is [ymin, xmin, ymax, xmax] on a 0–1000 scale of the receipt photo (Gemini's box_2d format).
 // We store only these 4 numbers per line and cut the one full photo in CSS — no extra images.
@@ -58,7 +59,7 @@ export function CropEditor({ src, box, angle: angle0 = 0, onSave, onClose }: {
         <p>1) หมุนให้บรรทัดตรง 2) ลากนิ้วเป็นกรอบรอบชื่อและราคา</p>
         <label className="angle-row">เอียง {angle > 0 ? '+' : ''}{angle}°
           <input type="range" min={-30} max={30} step={0.5} value={angle} onChange={(e) => setAngle(Number(e.target.value))} />
-          <button type="button" className="ghost" onClick={() => setAngle(0)} aria-label="รีเซ็ตมุม">↺</button>
+          <button type="button" className="ghost" onClick={() => setAngle(0)} aria-label="รีเซ็ตมุม"><RotateCcw size={18} /></button>
         </label>
       </div>
       <div ref={ref} className="crop-stage"

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowLeft, Check, Heart, House, Link2, List, Pencil, Plane, RefreshCw, UserMinus, UserPlus, X, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, share, shrink, useIsAdmin, useRates, type Member } from './supabase'
@@ -6,15 +7,19 @@ import { balances, convertNet, fmt } from './money'
 import { Avatar } from './Avatar'
 
 export type Group = { id: string; name: string; invite_code: string; type: string; start_on: string | null; end_on: string | null; cover_url: string | null; currency: string }
-export const GROUP_TYPES: Record<string, [string, string]> = { trip: ['✈️', 'ทริป'], home: ['🏠', 'บ้าน'], couple: ['❤️', 'คู่รัก'], other: ['📋', 'อื่น ๆ'] }
+export const GROUP_TYPES: Record<string, [LucideIcon, string]> = { trip: [Plane, 'ทริป'], home: [House, 'บ้าน'], couple: [Heart, 'คู่รัก'], other: [List, 'อื่น ๆ'] }
+export function TypeIcon({ type, size = 24 }: { type: string; size?: number }) {
+  const Icon = (GROUP_TYPES[type] ?? GROUP_TYPES.other)[0]
+  return <Icon size={size} aria-hidden />
+}
 export const tripDates = (g: Group) =>
   g.start_on && [g.start_on, g.end_on].filter(Boolean).map((d) => new Date(d!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })).join(' – ')
 
 // Cover photo, or the group type's icon.
 export function GroupIcon({ group, size = 64 }: { group: Pick<Group, 'type' | 'cover_url'>; size?: number }) {
   return (
-    <span className="group-avatar" style={{ width: size, height: size, fontSize: size / 2 }} aria-hidden>
-      {(GROUP_TYPES[group.type] ?? GROUP_TYPES.other)[0]}
+    <span className="group-avatar" style={{ width: size, height: size }} aria-hidden>
+      <TypeIcon type={group.type} size={Math.round(size * 0.45)} />
       {group.cover_url && <img src={group.cover_url} alt="" onError={(e) => e.currentTarget.remove()} />}
     </span>
   )
@@ -64,7 +69,7 @@ export function GroupSettings({ session }: { session: Session }) {
   return (
     <main>
       <header>
-        <Link to={`/g/${id}`} className="icon-btn" aria-label="กลับ">←</Link>
+        <Link to={`/g/${id}`} className="icon-btn" aria-label="กลับ"><ArrowLeft size={24} /></Link>
         <h1>ตั้งค่ากลุ่ม</h1>
       </header>
 
@@ -74,12 +79,12 @@ export function GroupSettings({ session }: { session: Session }) {
           <b>{group.name}</b>
           <small className="muted">{typeName}{tripDates(group) ? ` · ${tripDates(group)}` : ''}</small>
         </span>
-        <Link className="icon-btn" to={`/g/${id}/edit`} aria-label="แก้ไขกลุ่ม">✏️</Link>
+        <Link className="icon-btn" to={`/g/${id}/edit`} aria-label="แก้ไขกลุ่ม"><Pencil size={22} /></Link>
       </div>
 
       <h2>สมาชิกในกลุ่ม</h2>
       <button className="list-row" aria-expanded={adding} onClick={() => setAdding(!adding)}>
-        <span className="row-icon" aria-hidden>👤＋</span>เพิ่มเพื่อนที่ไม่ใช้แอป
+        <span className="row-icon" aria-hidden><UserPlus size={24} /></span>เพิ่มเพื่อนที่ไม่ใช้แอป
       </button>
       {adding && (
         <form onSubmit={addGuest} className="row">
@@ -88,11 +93,11 @@ export function GroupSettings({ session }: { session: Session }) {
         </form>
       )}
       <button className="list-row" onClick={() => share(`เข้ากลุ่ม ${group.name} ในหารกัน`, `${location.origin}/join/${group.invite_code}`)}>
-        <span className="row-icon" aria-hidden>🔗</span>ชวนเพื่อนด้วยลิงก์
+        <span className="row-icon" aria-hidden><Link2 size={24} /></span>ชวนเพื่อนด้วยลิงก์
       </button>
       {admin && (
         <button className="list-row" onClick={resetInvite}>
-          <span className="row-icon" aria-hidden>♻️</span>เปลี่ยนลิงก์เชิญ (ลิงก์เก่าใช้ไม่ได้)
+          <span className="row-icon" aria-hidden><RefreshCw size={24} /></span>เปลี่ยนลิงก์เชิญ (ลิงก์เก่าใช้ไม่ได้)
         </button>
       )}
 
@@ -116,7 +121,7 @@ export function GroupSettings({ session }: { session: Session }) {
               {est != null && <small className="muted">รวม ≈ {fmt(est, group.currency)}</small>}
             </span>
             {admin && m.user_id !== session.user.id && (
-              <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}>✕</button>
+              <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}><UserMinus size={20} /></button>
             )}
           </div>
         )
@@ -169,9 +174,9 @@ export function EditGroup() {
     <main>
       <form onSubmit={save} className="stack">
         <header>
-          <Link to={`/g/${id}/settings`} aria-label="ยกเลิก">✕</Link>
+          <Link to={`/g/${id}/settings`} className="icon-btn" aria-label="ยกเลิก"><X size={24} /></Link>
           <h1>แก้ไขกลุ่ม</h1>
-          <button>เสร็จ</button>
+          <button className="icon-btn save-btn" aria-label="บันทึก"><Check size={26} strokeWidth={2.5} /></button>
         </header>
         <div className="cover-edit">
           <GroupIcon group={f} size={88} />
@@ -191,10 +196,10 @@ export function EditGroup() {
         </label>
         <fieldset className="type-grid">
           <legend className="muted">ประเภท</legend>
-          {Object.entries(GROUP_TYPES).map(([t, [icon, label]]) => (
+          {Object.entries(GROUP_TYPES).map(([t, [Icon, label]]) => (
             <label key={t} className={`type-card ${f.type === t ? 'on' : ''}`}>
               <input type="radio" name="type" value={t} checked={f.type === t} onChange={() => setF({ ...f, type: t })} />
-              <span aria-hidden>{icon}</span>{label}
+              <Icon size={28} aria-hidden />{label}
             </label>
           ))}
         </fieldset>

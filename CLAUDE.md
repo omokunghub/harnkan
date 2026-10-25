@@ -31,7 +31,7 @@ Run `npx vitest run` and `npm run build` before every commit.
 - Pages: `App.tsx` (routes, home, join, account settings), `Group.tsx` (timeline, balances, currency toggle),
   `GroupSettings.tsx` (members+balances, admin actions, EditGroup), `AddExpense.tsx` (quick expense, split modes),
   `NewBill.tsx` (scan/edit receipt), `Bill.tsx` (tick items, ✏️ edit, ✂️ crop, comments), `SettleUp.tsx` (+ PromptPay/QR).
-- Shared UI: `Payers.tsx`, `Crop.tsx`, `Camera.tsx`, `Avatar.tsx`, `FormHeader.tsx`, `Activity.tsx`.
+- Shared UI: `Payers.tsx`, `Crop.tsx` (+ stackLayout for long receipts), `Camera.tsx`, `Avatar.tsx`, `FormHeader.tsx`, `Activity.tsx`.
 - `supabase/migrations/*.sql` — schema history. `supabase/db.test.ts` — RLS/trigger tests.
 
 ## Rules
@@ -43,6 +43,9 @@ Run `npx vitest run` and `npm run build` before every commit.
 - Activity log is written only by DB triggers; the app can't insert/update/delete `activity`.
 - Never put secrets in the repo or in `VITE_*` vars (they ship to the browser). Only the anon/publishable key is public.
   `.env.local` is git-ignored. Never ask for or use the service_role key.
+- **UI**: read `design-system/harnkan/MASTER.md` (top "overrides" block wins). Use the tokens in `src/index.css`, icons from
+  `lucide-react` (no emoji icons), Thai font Anuphan, touch targets ≥48px. For new UI, consult the project skill
+  `.claude/skills/ui-ux-pro-max` (`python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain ux|style|color`).
 - Keep it minimal: no new dependencies without a strong reason, stdlib/native first, mark deliberate shortcuts with `// ponytail:`.
 - Git: commits use the GitHub noreply email (repo config already set). Ask before deploying — deploys are the owner's call.
 
