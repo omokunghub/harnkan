@@ -33,6 +33,8 @@ export function GroupSettings({ session }: { session: Session }) {
   const [net, setNet] = useState<Map<string, Map<string, number>>>(new Map())
   const [guest, setGuest] = useState('')
   const [adding, setAdding] = useState(false)
+  const [mergeFor, setMergeFor] = useState<Member>() // guest being deleted / handed over
+  const [into, setInto] = useState('')
   const admin = useIsAdmin()
   const fx = useRates(group?.currency ?? 'THB')
 
@@ -57,6 +59,14 @@ export function GroupSettings({ session }: { session: Session }) {
     if (!confirm(`เอา ${memberName(m)} ออกจากกลุ่ม?${warn}\n\nชื่อจะยังอยู่ในบิลเก่า แต่จะเข้ากลุ่มไม่ได้อีกจนกว่าจะได้ลิงก์เชิญใหม่`)) return
     must(await sb.rpc('remove_member', { m: m.id }))
     load()
+  }
+  // Guest → hand their ticks/payments to `into` (or nobody, if they have nothing) and delete them.
+  const mergeGuest = async () => {
+    const target = members.find((m) => m.id === into)
+    if (!confirm(target ? `ย้ายทุกอย่างของ ${memberName(mergeFor)} (ที่ติ๊ก, ที่จ่าย, ที่โอน) ไปเป็นของ ${memberName(target)} แล้วลบ ${memberName(mergeFor)}?` : `ลบ ${memberName(mergeFor)}?`)) return
+    const r = await sb.rpc('merge_guest', { guest: mergeFor!.id, into_member: into || null })
+    if (r.error) return alert(r.error.message.includes('pick who') ? `${memberName(mergeFor)} มีบิลอยู่ เลือกก่อนว่าจะให้ใครรับยอดแทน` : r.error.message)
+    setMergeFor(undefined); setInto(''); load()
   }
   const resetInvite = async () => {
     if (!confirm('เปลี่ยนลิงก์เชิญ? ลิงก์เก่าที่เคยส่งไปจะใช้ไม่ได้ทันที')) return
@@ -105,7 +115,8 @@ export function GroupSettings({ session }: { session: Session }) {
         const mine = [...net].map(([cur, n]) => [cur, n.get(m.id) ?? 0] as const).filter(([, v]) => v)
         const est = mine.length > 1 && fx ? convertNet(net, group.currency, fx.rates).get(m.id) ?? 0 : null
         return (
-          <div key={m.id} className="line">
+          <div key={m.id}>
+          <div className="line">
             <Avatar member={m} size={48} />
             <span className="grow">
               <b>{memberName(m)}{m.user_id === session.user.id ? ' (คุณ)' : ''}</b>
@@ -121,8 +132,27 @@ export function GroupSettings({ session }: { session: Session }) {
               {est != null && <small className="muted">รวม ≈ {fmt(est, group.currency)}</small>}
             </span>
             {admin && m.user_id !== session.user.id && (
-              <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}><UserMinus size={20} /></button>
+              m.user_id && <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}><UserMinus size={20} /></button>
             )}
+            {!m.user_id && (
+              <button className="icon-btn" aria-label={`ลบหรือย้ายยอดของ ${memberName(m)}`} aria-expanded={mergeFor?.id === m.id}
+                onClick={() => { setMergeFor(mergeFor?.id === m.id ? undefined : m); setInto('') }}><UserMinus size={20} /></button>
+            )}
+          </div>
+          {mergeFor?.id === m.id && (
+            <div className="card stack">
+              <label>ให้ใครรับยอดของ {memberName(m)} แทน (ทั้งหนี้และเงินที่ได้คืน)
+                <select value={into} onChange={(e) => setInto(e.target.value)}>
+                  <option value="">ไม่มีใคร — ลบเลย (ได้เฉพาะคนที่ยังไม่มีบิล)</option>
+                  {active(members).filter((x) => x.id !== m.id).map((x) => <option key={x.id} value={x.id}>{memberName(x)}</option>)}
+                </select>
+              </label>
+              <div className="row">
+                <button type="button" className="ghost" onClick={() => setMergeFor(undefined)}>ยกเลิก</button>
+                <button type="button" onClick={mergeGuest}>{into ? 'ย้ายยอดแล้วลบ' : 'ลบ'}</button>
+              </div>
+            </div>
+          )}
           </div>
         )
       })}

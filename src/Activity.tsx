@@ -31,6 +31,7 @@ function describe(e: Entry, name: (memberId: string) => string, actorMember?: Me
     case 'settle_remove': return `ลบการโอน ${name(d.from)} → ${name(d.to)} ${n(d.amount)} ${d.currency}`
     case 'member_remove': return `เอา ${name(d.member)} ออกจากกลุ่ม`
     case 'invite_reset': return 'เปลี่ยนลิงก์เชิญ'
+    case 'guest_merge': return d.into ? `ย้ายยอดของ ${d.guest} (guest) ไปให้ ${name(d.into)} แล้วลบ ${d.guest}` : `ลบ guest ${d.guest}`
     default: return e.action
   }
 }

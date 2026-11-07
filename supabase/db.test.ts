@@ -211,3 +211,27 @@ test('crop angle limited to ±45°', async () => {
   await as(A, `update bill_items set crop_angle = -12.5 where id = $1`, [item])
   await expect(as(A, `update bill_items set crop_angle = 90 where id = $1`, [item])).rejects.toThrow()
 })
+
+test('guests can be deleted or merged into a member; ticks and payments move over', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: gu }] = await as(A, `insert into members (group_id, guest_name) values ($1, 'Oam2') returning id`, [g])
+  const [{ id: empty }] = await as(A, `insert into members (group_id, guest_name) values ($1, 'Typo') returning id`, [g])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'x', 300) returning id`, [g, gu])
+  const [{ id: item }] = await as(A, `insert into bill_items (bill_id, name, line_total) values ($1, 'rice', 300) returning id`, [bill])
+  await as(A, `insert into item_shares (item_id, member_id, weight) values ($1, $2, 2), ($1, $3, 1)`, [item, gu, mA])
+  await as(A, `insert into settlements (group_id, from_member, to_member, amount) values ($1, $2, $3, 50)`, [g, mA, gu])
+
+  await expect(as(C, `select merge_guest($1, null)`, [empty])).rejects.toThrow('not a member')
+  await expect(as(A, `select merge_guest($1, null)`, [gu])).rejects.toThrow('pick who')
+  await expect(as(A, `select merge_guest($1, $2)`, [mA, gu])).rejects.toThrow('guests only')
+  await as(A, `select merge_guest($1, null)`, [empty])
+  await as(A, `select merge_guest($1, $2)`, [gu, mA])
+
+  expect(await q(`select * from members where id in ($1, $2)`, [gu, empty])).toHaveLength(0)
+  expect((await q(`select paid_by from bills where id = $1`, [bill]))[0].paid_by).toBe(mA)
+  expect(await q(`select member_id, weight from item_shares where item_id = $1`, [item])).toEqual([{ member_id: mA, weight: 3 }])
+  expect(await q(`select * from settlements`)).toHaveLength(0) // A paying A
+  expect((await q(`select detail from activity where action = 'guest_merge'`)).map((r) => r.detail.guest)).toEqual(['Typo', 'Oam2'])
+})
