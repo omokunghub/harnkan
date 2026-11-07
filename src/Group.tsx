@@ -89,6 +89,16 @@ export default function GroupPage({ session }: { session: Session }) {
           </span>
         ))}
       </p>
+      {moves.some((mv) => mv.from === me?.id || mv.to === me?.id) && (
+        <ul className="my-moves">
+          {moves.filter((mv) => mv.from === me?.id || mv.to === me?.id).map((mv) => (
+            <li key={mv.from + mv.to + mv.cur}>
+              {mv.from === me?.id ? <>ติด <b>{name(mv.to)}</b></> : <><b>{name(mv.from)}</b> ติดคุณ</>}{' '}
+              <span className={mv.from === me?.id ? 'owe' : 'good'}>{approx}{fmt(mv.amount, mv.cur)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {curOptions.length > 1 && (
         <div className="tabs" role="group" aria-label="แสดงยอดเป็น">
           <small className="muted">แสดงเป็น</small>

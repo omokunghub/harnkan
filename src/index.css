@@ -149,6 +149,7 @@ input.narrow { width: 88px; flex: none; text-align: right; }
 .row-icon { width: 48px; display: grid; place-items: center; color: var(--accent); }
 .status { font-size: var(--fs-l); font-weight: 600; margin: var(--s2) 0 var(--s3); display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
 .status span { display: inline-flex; align-items: center; gap: var(--s1); }
+.my-moves { list-style: none; padding: 0; margin: calc(-1 * var(--s2)) 0 var(--s3); display: grid; gap: var(--s1); color: var(--muted); }
 .fx-note { font-size: var(--fs-xs); margin: var(--s1) 0 var(--s2); }
 .settings-head { padding: var(--s4) 0; }
 
