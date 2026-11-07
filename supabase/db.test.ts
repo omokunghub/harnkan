@@ -235,3 +235,15 @@ test('guests can be deleted or merged into a member; ticks and payments move ove
   expect(await q(`select * from settlements`)).toHaveLength(0) // A paying A
   expect((await q(`select detail from activity where action = 'guest_merge'`)).map((r) => r.detail.guest)).toEqual(['Typo', 'Oam2'])
 })
+
+test('a member can delete a wrong transfer; the log keeps it', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: gu }] = await as(A, `insert into members (group_id, guest_name) values ($1, 'Bob') returning id`, [g])
+  const [{ id: st }] = await as(A, `insert into settlements (group_id, from_member, to_member, amount) values ($1, $2, $3, 50) returning id`, [g, mA, gu])
+  expect(await as(C, `delete from settlements where id = $1 returning id`, [st])).toHaveLength(0) // outsider can't
+  await as(A, `delete from settlements where id = $1`, [st])
+  expect(await q(`select * from settlements`)).toHaveLength(0)
+  expect((await q(`select action from activity where action like 'settle_%' order by id`)).map((r) => r.action)).toEqual(['settle_add', 'settle_remove'])
+})

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, CalendarDays, CircleCheck, NotebookPen, Plus, ReceiptText, Settings, Users } from 'lucide-react'
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, CalendarDays, CircleCheck, NotebookPen, Plus, ReceiptText, Settings, Trash2, Users } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSignedUrl, type Member } from './supabase'
@@ -133,7 +133,7 @@ export default function GroupPage({ session }: { session: Session }) {
       {rows.map((r, i) => (
         <div key={r.bill?.id ?? r.settle!.id}>
           {(i === 0 || month(rows[i - 1].date) !== month(r.date)) && <h2>{month(r.date)}</h2>}
-          {r.bill ? <BillLine bill={r.bill} me={me?.id} name={you} toView={toView} view={view} /> : <SettleLine s={r.settle!} name={you} />}
+          {r.bill ? <BillLine bill={r.bill} me={me?.id} name={you} toView={toView} view={view} /> : <SettleLine s={r.settle!} name={you} onDeleted={load} />}
         </div>
       ))}
       {!rows.length && <p className="muted center-text">ยังไม่มีค่าใช้จ่าย กด "เพิ่มค่าใช้จ่าย" ด้านล่างได้เลย</p>}
@@ -182,14 +182,22 @@ function BillLine({ bill, me, name, toView, view }: {
   )
 }
 
-function SettleLine({ s, name }: { s: SettlementRow; name: (id: string) => string }) {
+function SettleLine({ s, name, onDeleted }: { s: SettlementRow; name: (id: string) => string; onDeleted: () => void }) {
   const slip = useSignedUrl(s.slip_path)
+  // the activity log keeps a record of the deleted transfer (DB trigger)
+  const del = async () => {
+    if (!confirm(`ลบรายการโอน ${name(s.from_member)} → ${name(s.to_member)} ${fmt(toMinor(s.amount, s.currency), s.currency)}?`)) return
+    must(await sb.from('settlements').delete().eq('id', s.id))
+    if (s.slip_path) await sb.storage.from('receipts').remove([s.slip_path])
+    onDeleted()
+  }
   return (
     <div className="line">
       <DateBox date={s.created_at} />
       <span className="icon" aria-hidden><Banknote size={22} /></span>
       <span className="grow">{name(s.from_member)} โอนให้ {name(s.to_member)} {fmt(toMinor(s.amount, s.currency), s.currency)}</span>
       {slip && <a className="right" href={slip} target="_blank">สลิป</a>}
+      <button className="icon-btn" aria-label="ลบรายการโอนนี้" onClick={del}><Trash2 size={18} /></button>
     </div>
   )
 }

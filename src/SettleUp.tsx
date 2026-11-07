@@ -39,6 +39,7 @@ export default function SettleUp({ session }: { session: Session }) {
   const [slip, setSlip] = useState<File>()
   const [err, setErr] = useState('')
   const [dirty, setDirty] = useState(false)
+  const [busy, setBusy] = useState(false) // a slow slip upload invited a second tap → duplicate transfer
 
   useEffect(() => {
     sb.from('members').select(MEMBER_COLS).eq('group_id', id).then((r) => {
@@ -51,6 +52,8 @@ export default function SettleUp({ session }: { session: Session }) {
   const to = members.find((m) => m.id === f.to_member)
   const save = async (e: FormEvent) => {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
     try {
       const sid = crypto.randomUUID()
       let slip_path = null
@@ -62,12 +65,13 @@ export default function SettleUp({ session }: { session: Session }) {
       nav(`/g/${id}`, { replace: true })
     } catch (e) {
       setErr((e as Error).message)
+      setBusy(false)
     }
   }
 
   return (
     <main>
-      <FormHeader title="บันทึกการโอน" back={`/g/${id}`} formId="settle-form" dirty={dirty} disabled={f.from_member === f.to_member} />
+      <FormHeader title="บันทึกการโอน" back={`/g/${id}`} formId="settle-form" dirty={dirty} disabled={busy || f.from_member === f.to_member} />
       <form id="settle-form" onSubmit={save} onChange={() => setDirty(true)} className="stack">
         <label>ใครโอน
           <select required value={f.from_member} onChange={(e) => setF({ ...f, from_member: e.target.value })}>
