@@ -130,3 +130,9 @@ test('long receipt photos stack at one width and shrink together when too tall',
   const tall = stackLayout([[1200, 4000], [1200, 4000]]) // 8000 > 6000 → ×0.75
   expect(tall).toEqual({ width: 900, heights: [3000, 3000] })
 })
+
+test('same dish ×3: one person had 2, another had 1', () => {
+  const b = bill({ grand_total: 300, bill_items: [{ line_total: 300, item_shares: [{ member_id: 'a', weight: 2 }, { member_id: 'b', weight: 1 }] }] })
+  const p = byMember(b)
+  expect([p.a.total, p.b.total]).toEqual([20000, 10000])
+})

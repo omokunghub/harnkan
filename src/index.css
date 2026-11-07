@@ -162,6 +162,8 @@ input.narrow { width: 88px; flex: none; text-align: right; }
 .item-edit { display: grid; grid-template-columns: 1fr 110px 48px; gap: var(--s2); align-items: center; }
 .item-edit small, .details-input { grid-column: 1 / -1; }
 .item-edit-inline { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.qty-row { align-items: center; }
+tfoot th { border-top: 2px solid var(--line); color: var(--text); font-weight: 700; }
 .item-tools { display: flex; gap: var(--s1); flex: none; }
 .item-tools .icon-btn { width: 44px; height: 44px; color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s3) 0 var(--s1); }
