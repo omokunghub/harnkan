@@ -93,8 +93,9 @@ export default function GroupPage({ session }: { session: Session }) {
         <ul className="my-moves">
           {moves.filter((mv) => mv.from === me?.id || mv.to === me?.id).map((mv) => (
             <li key={mv.from + mv.to + mv.cur}>
-              {mv.from === me?.id ? <>ติด <b>{name(mv.to)}</b></> : <><b>{name(mv.from)}</b> ติดคุณ</>}{' '}
-              <span className={mv.from === me?.id ? 'owe' : 'good'}>{approx}{fmt(mv.amount, mv.cur)}</span>
+              {mv.from === me?.id ? <Link to={`/g/${id}/settle?from=${mv.from}&to=${mv.to}&amount=${toMajor(mv.amount, mv.cur)}&cur=${mv.cur}`}>
+                ติด <b>{name(mv.to)}</b> <span className="owe">{approx}{fmt(mv.amount, mv.cur)}</span> — โอนเลย
+              </Link> : <><b>{name(mv.from)}</b> ติดคุณ <span className="good">{approx}{fmt(mv.amount, mv.cur)}</span></>}
             </li>
           ))}
         </ul>

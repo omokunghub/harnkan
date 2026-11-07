@@ -3,8 +3,7 @@ import { ArrowLeft, Pencil, Scissors, Square, SquareCheck, TriangleAlert, Users 
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
-import { allocate, checkReceipt, fmt, paidBy, toMajor, toMinor, UNCLAIMED, type Bill, type Item } from './money'
-import { PaymentQR, PromptPayQR } from './SettleUp'
+import { allocate, checkReceipt, fmt, paidBy, toMinor, UNCLAIMED, type Bill, type Item } from './money'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { CropEditor, CropView, type Box } from './Crop'
@@ -205,14 +204,7 @@ export default function BillPage({ session }: { session: Session }) {
       {bill.vat_included && <p className="muted">ราคาในใบเสร็จรวม VAT แล้ว — ช่อง VAT คือส่วนที่รวมอยู่ ไม่ได้บวกเพิ่ม</p>}
 
       {mine && me && payer && me.id !== payer.id && payers.length === 1 && (
-        <div className="card mine stack">
-          <p>คุณต้องจ่าย <b>{memberName(payer)}</b> <b>{fmt(mine.total, cur)}</b></p>
-          {cur === 'THB' && payer.profiles?.promptpay && <PromptPayQR id={payer.profiles.promptpay} amount={toMajor(mine.total, cur)} />}
-          <PaymentQR path={payer.profiles?.payment_qr_path} amountText={fmt(mine.total, cur)} />
-          <Link className="button ghost" to={`/g/${bill.group_id}/settle?from=${me.id}&to=${payer.id}&amount=${toMajor(mine.total, cur)}&cur=${cur}`}>
-            บันทึกว่าโอนแล้ว
-          </Link>
-        </div>
+        <p className="card mine">ส่วนของคุณในบิลนี้ <b>{fmt(mine.total, cur)}</b> (โอนคืน <b>{memberName(payer)}</b> ทีเดียวตอนเคลียร์ในหน้ากลุ่ม)</p>
       )}
 
       <h2>คอมเมนต์</h2>
