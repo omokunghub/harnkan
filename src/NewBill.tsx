@@ -37,7 +37,7 @@ export default function NewBill({ session }: { session: Session }) {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [payers, setPayers] = useState<Payers>({})
-  const [showPayers, setShowPayers] = useState(false)
+  const [showPayers, setShowPayers] = useState(q.has('payers'))
   const [dirty, setDirty] = useState(false)
   const [camera, setCamera] = useState(false)
   const [camError, setCamError] = useState('') // in-page camera failed → fall back to the phone's camera app

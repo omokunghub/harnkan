@@ -104,9 +104,11 @@ export default function BillPage({ session }: { session: Session }) {
         <h1>{bill.title}</h1>
         <Link to={simple ? `/b/${id}/expense` : `/b/${id}/edit`}>แก้</Link>
       </header>
-      <p className="muted">{payers.length > 1
-        ? payers.map(([m, v]) => `${name(m)} จ่าย ${fmt(v, cur)}`).join(' · ')
-        : `${memberName(payer)} จ่าย ${fmt(toMinor(bill.grand_total, cur), cur)}`}</p>
+      <Link className="pill" to={`${simple ? `/b/${id}/expense` : `/b/${id}/edit`}?payers=1`} aria-label="แก้คนจ่าย">
+        {payers.length > 1
+          ? payers.map(([m, v]) => `${name(m)} จ่าย ${fmt(v, cur)}`).join(' · ')
+          : `${memberName(payer)} จ่าย ${fmt(toMinor(bill.grand_total, cur), cur)}`} <Pencil size={14} aria-hidden />
+      </Link>
       {img && <a href={img} target="_blank"><img className="receipt" src={img} alt="ใบเสร็จ" /></a>}
 
       {!simple && <>

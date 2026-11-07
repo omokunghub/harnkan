@@ -48,12 +48,15 @@ export default function App() {
 
 function Login() {
   // redirect back to the same URL so invite links survive the sign-in
-  const go = () => sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.href } })
+  const go = () => sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } })
+  // Supabase sends failures back as ?error_description= or #error_description= — show it instead of silently looping
+  const err = new URLSearchParams(location.search + '&' + location.hash.slice(1)).get('error_description')
   return (
     <main className="center">
       <h1>หารกัน</h1>
       <p className="muted">ถ่ายใบเสร็จ ติ๊กของตัวเอง แล้วรู้เลยว่าต้องโอนใคร</p>
       <button onClick={go}>เข้าสู่ระบบด้วย Google</button>
+      {err && <p className="bad" role="alert">ล็อกอินไม่สำเร็จ: {err}</p>}
     </main>
   )
 }

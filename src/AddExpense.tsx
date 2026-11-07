@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ScanText } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type Member } from './supabase'
 import { Avatar } from './Avatar'
@@ -24,7 +24,7 @@ export default function AddExpense({ session }: { session: Session }) {
   const [itemId, setItemId] = useState<string>()
   const [showSplit, setShowSplit] = useState(false)
   const [payers, setPayers] = useState<Record<string, number>>({}) // empty = single payer f.paid_by
-  const [showPayers, setShowPayers] = useState(false)
+  const [showPayers, setShowPayers] = useState(useSearchParams()[0].has('payers'))
   const [err, setErr] = useState('')
   const [dirty, setDirty] = useState(false)
 
