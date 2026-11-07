@@ -161,7 +161,7 @@ export default function BillPage({ session }: { session: Session }) {
                 <input required aria-label="ชื่อรายการ" maxLength={200} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                 <input aria-label="รายละเอียด / add-on" placeholder="รายละเอียด / add-on" maxLength={500} value={draft.details}
                   onChange={(e) => setDraft({ ...draft, details: e.target.value })} />
-                <label className="row">จำนวน (ที่)<input aria-label="จำนวน" type="number" min="1" step="1" inputMode="numeric" className="narrow" value={draft.qty}
+                <label className="row">จำนวน (ที่)<input aria-label="จำนวน" type="number" min="1" step="1" inputMode="numeric" className="narrow" value={draft.qty} onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => setDraft({ ...draft, qty: e.target.value })} /></label>
                 <input required aria-label="ราคา" type="number" step="any" min="0" inputMode="decimal" value={draft.line_total}
                   onChange={(e) => setDraft({ ...draft, line_total: e.target.value })} />
@@ -180,8 +180,7 @@ export default function BillPage({ session }: { session: Session }) {
                       <label className="check">
                         <input type="checkbox" checked={!!s} onChange={(e) => setShare(i.id, m.id, e.target.checked ? 1 : 0)} /> {memberName(m)}
                       </label>
-                      {s && i.qty > 1 && <small className="muted">กี่ที่</small>}{s && <input aria-label={`ส่วนของ ${memberName(m)}`} type="number" min="1" className="narrow" value={s.weight}
-                        onChange={(e) => setShare(i.id, m.id, Math.max(1, Number(e.target.value)))} />}
+                      {s && i.qty > 1 && <small className="muted">กี่ที่</small>}{s && <WeightInput label={`ส่วนของ ${memberName(m)}`} value={s.weight} onSave={(w) => setShare(i.id, m.id, w)} />}
                     </div>
                   )
                 })}
@@ -234,4 +233,18 @@ export default function BillPage({ session }: { session: Session }) {
       <button className="ghost bad" onClick={remove}>ลบบิล</button>
     </main>
   )
+}
+
+// Lets the box be empty while typing (clear "1", type "2"); saves only a whole number ≥ 1, on blur / Enter.
+function WeightInput({ label, value, onSave }: { label: string; value: number; onSave: (w: number) => void }) {
+  const [v, setV] = useState(String(value))
+  useEffect(() => setV(String(value)), [value])
+  const commit = () => {
+    const w = Math.round(Number(v))
+    if (w >= 1 && w !== value) onSave(w)
+    else setV(String(value))
+  }
+  return <input aria-label={label} type="number" min="1" step="1" inputMode="numeric" className="narrow" value={v}
+    onFocus={(e) => e.currentTarget.select()} onChange={(e) => setV(e.target.value)} onBlur={commit}
+    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
 }
