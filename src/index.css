@@ -141,6 +141,7 @@ input.narrow { width: 88px; flex: none; text-align: right; }
 .line .grow b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .line .right { display: grid; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .line .icon { width: 44px; height: 44px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); border-radius: var(--r-m); }
+.line .icon.bill { background: var(--line); color: var(--text); }
 .date-box { display: grid; width: 40px; text-align: center; line-height: 1.15; color: var(--muted); font-size: var(--fs-xs); }
 .date-box b { font-size: var(--fs-l); color: var(--text); font-weight: 600; }
 .list-row { width: 100%; justify-content: flex-start; gap: var(--s4); background: none; border: 0; color: var(--text); font-weight: 500; padding: var(--s3) 0; border-radius: 0; }

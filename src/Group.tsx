@@ -168,7 +168,7 @@ function BillLine({ bill, me, name, toView, view }: {
   return (
     <Link className="line" to={`/b/${bill.id}`}>
       <DateBox date={bill.spent_on} />
-      <span className="icon" aria-hidden>{bill.image_path ? <ReceiptText size={22} /> : <NotebookPen size={22} />}</span>
+      <span className="icon bill" aria-hidden>{bill.image_path ? <ReceiptText size={22} /> : <NotebookPen size={22} />}</span>
       <span className="grow">
         <b>{bill.title}</b>
         <small className="muted">{payers.length > 1 ? `${payers.length} คนจ่าย` : `${name(bill.paid_by)} จ่าย`} {fmt(total, cur)}{est != null && ` (≈ ${fmt(est, view)})`}</small>
