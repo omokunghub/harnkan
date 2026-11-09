@@ -2,11 +2,11 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, CircleCheck, Eye, EyeOff } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, must, sb, shrink, useSession } from './supabase'
+import { BILL_COLS, fetchRates, must, sb, shrink, useSession } from './supabase'
 import { Avatar } from './Avatar'
 import { AvatarCropper } from './Crop'
 import { PaymentQR } from './SettleUp'
-import { balances, fmt } from './money'
+import { balances, fmt, inOne, memberNet } from './money'
 import AddExpense from './AddExpense'
 import { EditGroup, GroupIcon, GroupSettings } from './GroupSettings'
 import GroupPage from './Group'
@@ -62,7 +62,7 @@ function Login() {
   )
 }
 
-type Trip = { id: string; name: string; type: string; cover_url: string | null; net: [string, number][]; hidden: boolean }
+type Trip = { id: string; name: string; type: string; cover_url: string | null; net: [string, number][]; hidden: boolean; approx: boolean }
 
 function Groups({ session }: { session: Session }) {
   const [groups, setGroups] = useState<Trip[]>()
@@ -74,15 +74,20 @@ function Groups({ session }: { session: Session }) {
     sb.from('profiles').select('display_name, avatar_url').eq('id', session.user.id).single().then((r) => setMe(r.data ?? undefined))
     // ponytail: pulls every bill the user can see to show per-group status; a SQL view if it gets slow
     Promise.all([
-      sb.from('groups').select('id, name, type, cover_url').order('created_at', { ascending: false }),
+      sb.from('groups').select('id, name, type, cover_url, currency').order('created_at', { ascending: false }),
       sb.from('members').select('id, group_id, hidden_at').eq('user_id', session.user.id),
       sb.from('bills').select(BILL_COLS),
       sb.from('settlements').select('*'),
-    ]).then(([g, m, b, st]) => {
+    ]).then(async ([g, m, b, st]) => {
       const mine = new Map(must(m).map((x: { id: string; group_id: string; hidden_at: string | null }) => [x.group_id, x]))
-      setGroups(must(g).map((gr: { id: string; name: string; type: string; cover_url: string | null }) => {
-        const bal = balances(must(b).filter((x: { group_id: string }) => x.group_id === gr.id), must(st).filter((x: { group_id: string }) => x.group_id === gr.id))
-        return { ...gr, net: [...bal].map(([cur, n]) => [cur, n.get(mine.get(gr.id)!.id) ?? 0] as [string, number]).filter(([, v]) => v), hidden: !!mine.get(gr.id)!.hidden_at }
+      const rows = must(g).map((gr: { id: string; name: string; type: string; cover_url: string | null; currency: string }) => ({
+        gr, bal: balances(must(b).filter((x: { group_id: string }) => x.group_id === gr.id), must(st).filter((x: { group_id: string }) => x.group_id === gr.id)),
+      }))
+      const mixed = rows.filter(({ gr, bal }) => [...bal.keys()].some((c) => c !== gr.currency)).map(({ gr }) => gr.currency)
+      const fx = new Map(await Promise.all([...new Set(mixed)].map(async (c) => [c, (await fetchRates(c).catch(() => undefined))?.rates] as const)))
+      setGroups(rows.map(({ gr, bal }) => {
+        const one = inOne(bal, gr.currency, fx.get(gr.currency))
+        return { ...gr, net: memberNet(bal, one, gr.currency, mine.get(gr.id)!.id), hidden: !!mine.get(gr.id)!.hidden_at, approx: !!one && [...bal.keys()].some((c) => c !== gr.currency) }
       }))
     })
   }, [session.user.id])
@@ -112,7 +117,7 @@ function Groups({ session }: { session: Session }) {
           <span className="grow">
             <b>{g.name}</b>
             {g.net.length ? g.net.map(([cur, v]) => (
-              <small key={cur} className={v > 0 ? 'good' : 'owe'}>{v > 0 ? `คุณได้คืน ${fmt(v, cur)}` : `คุณติดอยู่ ${fmt(-v, cur)}`}</small>
+              <small key={cur} className={v > 0 ? 'good' : 'owe'}>{v > 0 ? 'คุณได้คืน' : 'คุณติดอยู่'} {g.approx && '≈ '}{fmt(Math.abs(v), cur)}</small>
             )) : <small className="muted">เคลียร์แล้ว</small>}
           </span>
         </Link>

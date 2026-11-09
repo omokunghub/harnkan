@@ -68,19 +68,24 @@ export function must<T>(r: { data: T; error: { message: string } | null }) {
 export const CURRENCIES = ['THB', 'JPY', 'KRW', 'CNY', 'TWD', 'HKD', 'SGD', 'MYR', 'VND', 'USD', 'EUR', 'GBP', 'AUD']
 
 // Daily FX rates into `to` (1 unit of X = rates[X] `to`), from the ECB via frankfurter.dev. Cached per day in the browser.
+type Rates = { date: string; rates: Record<string, number> }
+const ratesKey = (to: string) => `fx:${to}:${new Date().toLocaleDateString('sv')}`
+function cachedRates(to: string): Rates | undefined {
+  try { return JSON.parse(localStorage.getItem(ratesKey(to)) ?? 'null') ?? undefined } catch { return undefined } // private mode
+}
+export async function fetchRates(to: string): Promise<Rates> {
+  const hit = cachedRates(to)
+  if (hit) return hit
+  const d = await (await fetch(`https://api.frankfurter.dev/v1/latest?base=${to}`)).json()
+  // API gives 1 `to` = d.rates[X] X; flip it
+  const v = { date: d.date, rates: Object.fromEntries(Object.entries(d.rates as Record<string, number>).map(([c, x]) => [c, 1 / x])) }
+  try { localStorage.setItem(ratesKey(to), JSON.stringify(v)) } catch { /* ignore */ }
+  return v
+}
 export function useRates(to: string) {
-  const [r, setR] = useState<{ date: string; rates: Record<string, number> }>()
-  useEffect(() => {
-    const key = `fx:${to}:${new Date().toLocaleDateString('sv')}`
-    try { const hit = localStorage.getItem(key); if (hit) return setR(JSON.parse(hit)) } catch { /* private mode */ }
-    fetch(`https://api.frankfurter.dev/v1/latest?base=${to}`).then((res) => res.json()).then((d) => {
-      // API gives 1 `to` = d.rates[X] X; flip it
-      const v = { date: d.date, rates: Object.fromEntries(Object.entries(d.rates as Record<string, number>).map(([c, x]) => [c, 1 / x])) }
-      setR(v)
-      try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* ignore */ }
-    }).catch(() => setR(undefined))
-  }, [to])
-  return r
+  const [r, setR] = useState<Rates & { to: string }>()
+  useEffect(() => { fetchRates(to).then((v) => setR({ ...v, to })).catch(() => setR(undefined)) }, [to])
+  return r?.to === to ? r : cachedRates(to) // never hand back another currency's rates while switching
 }
 
 export function useIsAdmin() {

@@ -6,7 +6,7 @@ import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSign
 import { Avatar } from './Avatar'
 import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
-import { allocate, balances, convertNet, fmt, paidBy, shortName, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
+import { allocate, balances, fmt, inOne, memberNet, paidBy, shortName, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
 
 type BillRow = Bill & { id: string; title: string; spent_on: string; image_path: string | null }
 type SettlementRow = Settlement & { id: string; slip_path: string | null; created_at: string }
@@ -49,14 +49,12 @@ export default function GroupPage({ session }: { session: Session }) {
   const curOptions = [...new Set([group.currency, ...used])]
   // Everything in one currency when possible: exact if nothing needs converting, else an estimate from today's rate.
   const exact = used.every((c) => c === view)
-  const one = exact ? (bal.get(view) ?? new Map<string, number>()) : fx ? convertNet(bal, view, fx.rates) : null
+  const one = inOne(bal, view, fx?.rates)
   const estimate = !exact && !!one
   const moves = one
     ? simplify(one).map((mv) => ({ cur: view, ...mv }))
     : [...bal].flatMap(([cur, net]) => simplify(net).map((mv) => ({ cur, ...mv }))) // rates unavailable: per currency
-  const myNet: (readonly [string, number])[] = one
-    ? [[view, one.get(me?.id ?? '') ?? 0] as const].filter(([, v]) => v)
-    : [...bal].map(([cur, net]) => [cur, net.get(me?.id ?? '') ?? 0] as const).filter(([, v]) => v)
+  const myNet = memberNet(bal, one, view, me?.id ?? '')
   const approx = estimate ? '≈ ' : ''
   const toView = (minor: number, cur: string) => (cur === view || !fx?.rates[cur] ? null : toMinor(toMajor(minor, cur) * fx.rates[cur], view))
 

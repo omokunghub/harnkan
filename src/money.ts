@@ -129,6 +129,19 @@ export function balances(bills: Bill[], settlements: Settlement[]) {
   return out
 }
 
+// A group's balances in one currency: exact if nothing needs converting, an estimate from `rates` otherwise,
+// null when rates are unavailable. Home and the group page must agree, so both go through here.
+export function inOne(bal: Map<string, Map<string, number>>, view: string, rates?: Record<string, number>) {
+  if ([...bal.keys()].every((c) => c === view)) return bal.get(view) ?? new Map<string, number>()
+  return rates ? convertNet(bal, view, rates) : null
+}
+
+// One member's position, as [currency, amount] pairs; per currency only when `one` is null.
+export function memberNet(bal: Map<string, Map<string, number>>, one: Map<string, number> | null, view: string, member: string) {
+  const rows: [string, number][] = one ? [[view, one.get(member) ?? 0]] : [...bal].map(([cur, net]) => [cur, net.get(member) ?? 0])
+  return rows.filter(([, v]) => v)
+}
+
 // Fewest-ish transfers: match biggest debtor with biggest creditor. At most n-1 transfers.
 export function simplify(net: Map<string, number>) {
   const cred = [...net].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])

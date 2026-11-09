@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { allocate, applyRates, balances, checkReceipt, convertNet, detectSplit, shortName, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
+import { allocate, applyRates, balances, checkReceipt, convertNet, detectSplit, inOne, memberNet, shortName, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
 
 const sh = (...ms: string[]) => ms.map((member_id) => ({ member_id, weight: 1 }))
 const bill = (p: Partial<Bill>): Bill => ({
@@ -144,4 +144,12 @@ test('shortName only shortens long names', () => {
   expect(shortName('สมชาย เจริญรุ่งเรืองกิจ')).toBe('สมชาย จ.')
   expect(shortName('Anna Maria van der Berg')).toBe('Anna B.')
   expect(shortName('Abcdefghijklmnopqrstuvwxyz')).toBe('Abcdefghijklm…')
+})
+
+test('a trip paid back in another currency counts as clear', () => {
+  const bal = new Map([['THB', new Map([['a', -53359]])], ['JPY', new Map([['a', 2518]])]])
+  const one = inOne(bal, 'THB', { JPY: 0.211910 })
+  expect(memberNet(bal, one, 'THB', 'a')).toEqual([])
+  expect(memberNet(bal, inOne(bal, 'THB'), 'THB', 'a')).toEqual([['THB', -53359], ['JPY', 2518]]) // no rates: per currency
+  expect(inOne(new Map([['THB', new Map([['a', 5]])]]), 'THB')?.get('a')).toBe(5) // one currency needs no rates
 })
