@@ -76,6 +76,7 @@ button:hover:not(:disabled), .button:hover { opacity: .9; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .ghost { background: transparent; color: var(--accent); border-color: var(--line); }
 .ghost:hover:not(:disabled) { background: var(--accent-soft); opacity: 1; }
+@media (hover: none) { .ghost:hover:not(:disabled) { background: transparent; } } /* phones: a tapped button shouldn't stay highlighted */
 button.bad { background: transparent; border-color: var(--bad); color: var(--bad); margin-top: var(--s6); }
 .icon-btn {
   width: var(--tap); height: var(--tap); min-height: 0; padding: 0; display: grid; place-items: center; flex: none;

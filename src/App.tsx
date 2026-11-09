@@ -253,9 +253,16 @@ function Profile({ session }: { session: Session }) {
   }
   const [pushOn, setPushOn] = useState(false)
   useEffect(() => { pushSub().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
-  const push = () => (pushOn ? disablePush() : enablePush()).then(
-    () => { setPushOn(!pushOn); setMsg(pushOn ? 'ปิดแจ้งเตือนแล้ว' : 'เปิดแจ้งเตือนแล้ว') },
-    (e) => setMsg(String(e.message ?? e)))
+  const push = async () => {
+    if (busy) return // each tap talks to the server; rapid taps would overlap
+    setBusy(true); setMsg('')
+    try {
+      await (pushOn ? disablePush() : enablePush())
+      setMsg(pushOn ? 'ปิดแจ้งเตือนแล้ว' : 'เปิดแจ้งเตือนแล้ว')
+    } catch (e) { setMsg(String((e as Error).message ?? e)) }
+    setPushOn(!!(await pushSub().catch(() => null))) // show what the device really has
+    setBusy(false)
+  }
   return (
     <main>
       <header>
@@ -292,8 +299,8 @@ function Profile({ session }: { session: Session }) {
         </label>
         {p.payment_qr_path && <button type="button" className="ghost" disabled={busy} onClick={() => setQr()}>ลบ QR</button>}
       </div>
-      <button className="ghost" aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
-      <button className="ghost" onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
+      <button className="ghost" style={{ width: '100%' }} disabled={busy} aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
+      <button className="ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}
       {cropping && <AvatarCropper file={cropping} onDone={upload} onClose={() => setCropping(undefined)} />}
     </main>
