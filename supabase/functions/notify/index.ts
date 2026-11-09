@@ -19,13 +19,14 @@ Deno.serve(async (req) => {
   let to: string | null | undefined, msg: { title: string; body: string; url: string }
   if (table === 'bill_notifies') {
     const [{ data: bill }, member, { data: actor }] = await Promise.all([
-      sb.from('bills').select('title').eq('id', record.bill_id).single(),
+      sb.from('bills').select('title, groups(name)').eq('id', record.bill_id).single(),
       memberOf(record.member_id),
       sb.from('profiles').select('display_name').eq('id', record.actor).single(),
     ])
     if (!bill) return new Response('gone')
     to = member?.user_id
-    msg = { title: `บิลใหม่: ${bill.title}`, body: `${actor?.display_name || 'เพื่อน'} เพิ่มชื่อคุณในบิลนี้`, url: `/b/${record.bill_id}` }
+    const group = bill.groups as unknown as { name: string } | null
+    msg = { title: group?.name ?? 'หารกัน', body: `${actor?.display_name || 'เพื่อน'} เพิ่มคุณในบิล ${bill.title}`, url: `/b/${record.bill_id}` }
   } else if (table === 'settlements') {
     const [creditor, payer, { data: group }] = await Promise.all([
       memberOf(record.to_member), memberOf(record.from_member),
