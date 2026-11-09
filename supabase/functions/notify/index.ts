@@ -36,10 +36,11 @@ Deno.serve(async (req) => {
   if (!to) return new Response('no account') // guests have no phone
 
   const { data: subs } = await sb.from('push_subs').select('endpoint, sub').eq('user_id', to)
-  await Promise.all((subs ?? []).map((s) =>
-    webpush.sendNotification(s.sub, JSON.stringify(msg)).catch(async (e: { statusCode?: number }) => {
+  const sent = await Promise.all((subs ?? []).map((s) =>
+    webpush.sendNotification(s.sub, JSON.stringify(msg)).then(() => 'sent', async (e: { statusCode?: number; body?: string; message?: string }) => {
       // phone unsubscribed or app removed → forget it
       if (e.statusCode === 404 || e.statusCode === 410) await sb.from('push_subs').delete().eq('endpoint', s.endpoint)
+      return `failed ${e.statusCode ?? e.message} ${e.body ?? ''}`.trim()
     })))
-  return new Response('ok')
+  return new Response(sent.length ? sent.join(' | ') : 'no devices') // shows up in net._http_response
 })

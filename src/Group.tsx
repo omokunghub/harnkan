@@ -8,9 +8,9 @@ import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { allocate, balances, fmt, inOne, memberNet, paidBy, shortName, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
 
-type BillRow = Bill & { id: string; title: string; spent_on: string; image_path: string | null }
+type BillRow = Bill & { id: string; title: string; spent_on: string; created_at: string; image_path: string | null }
 type SettlementRow = Settlement & { id: string; slip_path: string | null; created_at: string }
-type Row = { date: string; bill?: BillRow; settle?: SettlementRow }
+type Row = { date: string; at: string; bill?: BillRow; settle?: SettlementRow }
 
 export default function GroupPage({ session }: { session: Session }) {
   const { id } = useParams() as { id: string }
@@ -59,9 +59,9 @@ export default function GroupPage({ session }: { session: Session }) {
   const toView = (minor: number, cur: string) => (cur === view || !fx?.rates[cur] ? null : toMinor(toMajor(minor, cur) * fx.rates[cur], view))
 
   const rows: Row[] = [
-    ...bills.map((bill) => ({ date: bill.spent_on, bill })),
-    ...settles.map((settle) => ({ date: settle.created_at.slice(0, 10), settle })),
-  ].sort((a, b) => b.date.localeCompare(a.date))
+    ...bills.map((bill) => ({ date: bill.spent_on, at: bill.created_at, bill })),
+    ...settles.map((settle) => ({ date: new Date(settle.created_at).toLocaleDateString('sv'), at: settle.created_at, settle })),
+  ].sort((a, b) => b.date.localeCompare(a.date) || +new Date(b.at) - +new Date(a.at)) // same day: last added on top
   const month = (d: string) => new Date(d).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
 
   return (
