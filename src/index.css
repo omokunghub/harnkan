@@ -201,6 +201,9 @@ th { color: var(--muted); font-weight: 500; }
 .cover-edit { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 
 /* ---------- activity, QR ---------- */
+.push-ask { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s3); margin-bottom: var(--s3); }
+.push-ask p { margin: 0 0 var(--s2); }
+.push-ask svg { vertical-align: -4px; }
 .group-row { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
 .group-row .line { flex: 1; min-width: 0; border-bottom: 0; }
 .group-row .icon-btn { color: var(--muted); }

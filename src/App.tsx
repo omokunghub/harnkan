@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, CircleCheck, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, CircleCheck, Eye, EyeOff } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { BILL_COLS, fetchRates, must, sb, shrink, useSession } from './supabase'
@@ -21,6 +21,19 @@ async function enablePush() {
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY })
   must(await sb.from('push_subs').upsert({ endpoint: sub.endpoint, sub: sub.toJSON() }))
+}
+
+// This device's current subscription, if any.
+async function pushSub() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  return (await navigator.serviceWorker.ready).pushManager.getSubscription()
+}
+async function disablePush() {
+  const sub = await pushSub()
+  if (!sub) return
+  must(await sb.from('push_subs').delete().eq('endpoint', sub.endpoint))
+  await sub.unsubscribe()
+  try { localStorage.setItem('push-asked', '1') } catch { /* private mode */ } // turned off on purpose: don't ask again
 }
 
 export default function App() {
@@ -67,9 +80,24 @@ type Trip = { id: string; name: string; type: string; cover_url: string | null; 
 function Groups({ session }: { session: Session }) {
   const [groups, setGroups] = useState<Trip[]>()
   const [msg, setMsg] = useState('')
+  const [askPush, setAskPush] = useState(false)
   const [name, setName] = useState('')
   const [me, setMe] = useState<{ display_name: string; avatar_url: string | null }>()
   const nav = useNavigate()
+  useEffect(() => {
+    // A banner, not a prompt on load: iPhone only allows the permission request from a tap, and Chrome hides unprompted ones.
+    if (!('PushManager' in window) || !('Notification' in window)) return
+    pushSub().then((sub) => {
+      if (sub) return enablePush() // make sure the server still knows this device
+      if (Notification.permission === 'denied') return
+      try { setAskPush(!localStorage.getItem('push-asked')) } catch { setAskPush(true) } // private mode
+    }).catch(() => {})
+  }, [session.user.id])
+  const answerPush = (yes: boolean) => {
+    setAskPush(false)
+    try { localStorage.setItem('push-asked', '1') } catch { /* private mode */ }
+    if (yes) enablePush().then(() => setMsg(''), (e) => setMsg(`เปิดแจ้งเตือนไม่สำเร็จ: ${e.message ?? e}`))
+  }
   useEffect(() => {
     sb.from('profiles').select('display_name, avatar_url').eq('id', session.user.id).single().then((r) => setMe(r.data ?? undefined))
     // ponytail: pulls every bill the user can see to show per-group status; a SQL view if it gets slow
@@ -134,6 +162,15 @@ function Groups({ session }: { session: Session }) {
         <Link to="/me" aria-label="ตั้งค่าบัญชี"><Avatar url={me?.avatar_url} name={me?.display_name ?? '?'} size={36} /></Link>
       </header>
       <p className="status">{all.length ? groups.length + ' กลุ่ม' : <span className="good"><CircleCheck size={20} aria-hidden /> คุณเคลียร์หมดทุกกลุ่มแล้ว</span>}</p>
+      {askPush && (
+        <section className="push-ask" aria-label="เปิดการแจ้งเตือน">
+          <p><Bell size={20} aria-hidden /> เปิดแจ้งเตือนไหม? จะได้รู้เมื่อเพื่อนเพิ่มชื่อคุณในบิล หรือโอนเงินคืนให้คุณ</p>
+          <div className="row">
+            <button className="ghost" onClick={() => answerPush(false)}>ไว้ก่อน</button>
+            <button onClick={() => answerPush(true)}>เปิดแจ้งเตือน</button>
+          </div>
+        </section>
+      )}
       {msg && <p className="bad" role="alert">{msg}</p>}
       {groups.filter((g) => !folded.includes(g)).map(row)}
       {folded.length > 0 && (
@@ -214,7 +251,11 @@ function Profile({ session }: { session: Session }) {
     must(await sb.from('profiles').update({ display_name: p.display_name.trim(), promptpay: p.promptpay || null }).eq('id', uid))
     setMsg('บันทึกแล้ว')
   }
-  const push = () => enablePush().then(() => setMsg('เปิดแจ้งเตือนแล้ว'), (e) => setMsg(String(e.message ?? e)))
+  const [pushOn, setPushOn] = useState(false)
+  useEffect(() => { pushSub().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
+  const push = () => (pushOn ? disablePush() : enablePush()).then(
+    () => { setPushOn(!pushOn); setMsg(pushOn ? 'ปิดแจ้งเตือนแล้ว' : 'เปิดแจ้งเตือนแล้ว') },
+    (e) => setMsg(String(e.message ?? e)))
   return (
     <main>
       <header>
@@ -251,7 +292,7 @@ function Profile({ session }: { session: Session }) {
         </label>
         {p.payment_qr_path && <button type="button" className="ghost" disabled={busy} onClick={() => setQr()}>ลบ QR</button>}
       </div>
-      <button className="ghost" onClick={push}>เปิดแจ้งเตือนบิลใหม่</button>
+      <button className="ghost" aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
       <button className="ghost" onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}
       {cropping && <AvatarCropper file={cropping} onDone={upload} onClose={() => setCropping(undefined)} />}
