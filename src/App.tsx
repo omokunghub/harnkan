@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, CircleCheck } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Eye, EyeOff } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { BILL_COLS, must, sb, shrink, useSession } from './supabase'
@@ -62,8 +62,11 @@ function Login() {
   )
 }
 
+type Trip = { id: string; name: string; type: string; cover_url: string | null; net: [string, number][]; hidden: boolean }
+
 function Groups({ session }: { session: Session }) {
-  const [groups, setGroups] = useState<{ id: string; name: string; type: string; cover_url: string | null; net: [string, number][] }[]>()
+  const [groups, setGroups] = useState<Trip[]>()
+  const [msg, setMsg] = useState('')
   const [name, setName] = useState('')
   const [me, setMe] = useState<{ display_name: string; avatar_url: string | null }>()
   const nav = useNavigate()
@@ -72,14 +75,14 @@ function Groups({ session }: { session: Session }) {
     // ponytail: pulls every bill the user can see to show per-group status; a SQL view if it gets slow
     Promise.all([
       sb.from('groups').select('id, name, type, cover_url').order('created_at', { ascending: false }),
-      sb.from('members').select('id, group_id').eq('user_id', session.user.id),
+      sb.from('members').select('id, group_id, hidden_at').eq('user_id', session.user.id),
       sb.from('bills').select(BILL_COLS),
       sb.from('settlements').select('*'),
     ]).then(([g, m, b, st]) => {
-      const mine = new Map(must(m).map((x: { id: string; group_id: string }) => [x.group_id, x.id]))
+      const mine = new Map(must(m).map((x: { id: string; group_id: string; hidden_at: string | null }) => [x.group_id, x]))
       setGroups(must(g).map((gr: { id: string; name: string; type: string; cover_url: string | null }) => {
         const bal = balances(must(b).filter((x: { group_id: string }) => x.group_id === gr.id), must(st).filter((x: { group_id: string }) => x.group_id === gr.id))
-        return { ...gr, net: [...bal].map(([cur, n]) => [cur, n.get(mine.get(gr.id)!) ?? 0] as [string, number]).filter(([, v]) => v) }
+        return { ...gr, net: [...bal].map(([cur, n]) => [cur, n.get(mine.get(gr.id)!.id) ?? 0] as [string, number]).filter(([, v]) => v), hidden: !!mine.get(gr.id)!.hidden_at }
       }))
     })
   }, [session.user.id])
@@ -89,15 +92,22 @@ function Groups({ session }: { session: Session }) {
   }
   if (!groups) return null
   const all = groups.flatMap((g) => g.net)
-  return (
-    <main>
-      <header>
-        <h1>หารกัน</h1>
-        <Link to="/me" aria-label="ตั้งค่าบัญชี"><Avatar url={me?.avatar_url} name={me?.display_name ?? '?'} size={36} /></Link>
-      </header>
-      <p className="status">{all.length ? groups.length + ' กลุ่ม' : <span className="good"><CircleCheck size={20} aria-hidden /> คุณเคลียร์หมดทุกกลุ่มแล้ว</span>}</p>
-      {groups.map((g) => (
-        <Link key={g.id} className="line group-line" to={`/g/${g.id}`}>
+  const owes = (g: Trip) => g.net.some(([, v]) => v < 0)
+  const folded = groups.filter((g) => g.hidden && !owes(g)) // a new debt brings a hidden trip back by itself
+  const setHidden = async (g: Trip, hide: boolean) => {
+    // ponytail: checked in the browser only; hiding just tidies your own list, so there's nothing to protect server-side
+    if (hide && owes(g)) return setMsg(`ยังซ่อน "${g.name}" ไม่ได้ เพราะคุณยังติดเงินเพื่อนในทริปนี้`)
+    setMsg('')
+    try {
+      must(await sb.rpc('set_group_hidden', { g: g.id, hide }))
+      setGroups(groups.map((x) => (x.id === g.id ? { ...x, hidden: hide } : x)))
+    } catch (e) { setMsg(`ทำไม่สำเร็จ: ${(e as Error).message}`) }
+  }
+  const row = (g: Trip) => {
+    const isFolded = folded.includes(g)
+    return (
+      <div key={g.id} className="group-row">
+        <Link className="line group-line" to={`/g/${g.id}`}>
           <GroupIcon group={g} size={56} />
           <span className="grow">
             <b>{g.name}</b>
@@ -106,7 +116,27 @@ function Groups({ session }: { session: Session }) {
             )) : <small className="muted">เคลียร์แล้ว</small>}
           </span>
         </Link>
-      ))}
+        <button className="icon-btn" aria-label={`${isFolded ? 'เลิกซ่อน' : 'ซ่อน'} ${g.name}`} onClick={() => setHidden(g, !isFolded)}>
+          {isFolded ? <Eye size={20} /> : <EyeOff size={20} />}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <main>
+      <header>
+        <h1>หารกัน</h1>
+        <Link to="/me" aria-label="ตั้งค่าบัญชี"><Avatar url={me?.avatar_url} name={me?.display_name ?? '?'} size={36} /></Link>
+      </header>
+      <p className="status">{all.length ? groups.length + ' กลุ่ม' : <span className="good"><CircleCheck size={20} aria-hidden /> คุณเคลียร์หมดทุกกลุ่มแล้ว</span>}</p>
+      {msg && <p className="bad" role="alert">{msg}</p>}
+      {groups.filter((g) => !folded.includes(g)).map(row)}
+      {folded.length > 0 && (
+        <details className="activity">
+          <summary>ทริปที่ซ่อนไว้ ({folded.length})</summary>
+          {folded.map(row)}
+        </details>
+      )}
       {!groups.length && <p className="muted">ยังไม่มีกลุ่ม สร้างใหม่ หรือขอลิงก์เชิญจากเพื่อน</p>}
       <form onSubmit={create} className="row">
         <input required placeholder="ชื่อกลุ่มใหม่ เช่น ทริปญี่ปุ่น" value={name} onChange={(e) => setName(e.target.value)} />

@@ -247,3 +247,37 @@ test('a member can delete a wrong transfer; the log keeps it', async () => {
   expect(await q(`select * from settlements`)).toHaveLength(0)
   expect((await q(`select action from activity where action like 'settle_%' order by id`)).map((r) => r.action)).toEqual(['settle_add', 'settle_remove'])
 })
+
+test('push queue: one row per friend per bill, never for yourself or guests, and clients cannot touch it', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [invite_code])
+  const [{ id: mA }] = await q(`select id from members where user_id = $1`, [A])
+  const [{ id: mB }] = await q(`select id from members where user_id = $1`, [B])
+  const [{ id: gu }] = await as(A, `insert into members (group_id, guest_name) values ($1, 'Guest') returning id`, [g])
+  const [{ id: bill }] = await as(A, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'Dinner', 200) returning id`, [g, mA])
+  const [i1, i2] = (await as(A, `insert into bill_items (bill_id, name, line_total) values ($1, 'Rice', 100), ($1, 'Soup', 100) returning id`, [bill])).map((r) => r.id)
+
+  await as(A, `insert into item_shares (item_id, member_id) values ($1, $2), ($1, $3), ($1, $4), ($5, $3)`, [i1, mA, mB, gu, i2])
+  expect(await q(`select member_id, actor from bill_notifies`)).toEqual([{ member_id: mB, actor: A }])
+
+  await as(B, `insert into item_shares (item_id, member_id) values ($1, $2)`, [i2, mA]) // B adds A → A hears about it
+  expect((await q(`select member_id from bill_notifies order by created_at`)).map((r) => r.member_id).sort()).toEqual([mA, mB].sort())
+
+  expect(await as(A, `select * from bill_notifies`)).toHaveLength(0)
+  await expect(as(A, `insert into bill_notifies (bill_id, member_id, actor) values ($1, $2, $3)`, [bill, mB, A])).rejects.toThrow('row-level security')
+})
+
+test('hiding a trip only changes your own row', async () => {
+  const { q, as } = await setup()
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [invite_code])
+  await as(C, `select set_group_hidden($1, true)`, [g]) // outsider: no row, no effect
+  await as(A, `select set_group_hidden($1, true)`, [g])
+  const hidden = async () => (await q(`select user_id from members where hidden_at is not null`)).map((r) => r.user_id)
+  expect(await hidden()).toEqual([A])
+  await as(A, `select set_group_hidden($1, false)`, [g])
+  expect(await hidden()).toEqual([])
+})

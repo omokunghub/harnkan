@@ -58,7 +58,7 @@ supabase/functions    scan-receipt (Gemini), notify (push)
    npx supabase secrets set VAPID_PUBLIC_KEY=<pub> VAPID_PRIVATE_KEY=<priv> VAPID_SUBJECT=mailto:<อีเมลคุณ> NOTIFY_SECRET=<สุ่มยาวๆ>
    npx supabase functions deploy notify --no-verify-jwt
    ```
-4. ไปที่ **Database → Webhooks** แล้วสร้าง 2 อัน คือ `bills` INSERT และ `comments` INSERT
+4. ไปที่ **Database → Webhooks** แล้วสร้าง 2 อัน คือ `bill_notifies` INSERT และ `settlements` INSERT
    - ประเภทเลือก Supabase Edge Functions → `notify`
    - เพิ่ม HTTP header `x-notify-secret: <NOTIFY_SECRET>`
 5. ถ้าเพื่อนใช้ iPhone ต้องเป็น iOS 16.4 ขึ้นไป และต้อง Add to Home Screen แล้วเปิดแอปจากไอคอนก่อน ถึงจะกดเปิดแจ้งเตือนได้
