@@ -27,11 +27,14 @@ Deno.serve(async (req) => {
     to = member?.user_id
     msg = { title: `บิลใหม่: ${bill.title}`, body: `${actor?.display_name || 'เพื่อน'} เพิ่มชื่อคุณในบิลนี้`, url: `/b/${record.bill_id}` }
   } else if (table === 'settlements') {
-    const [creditor, payer] = await Promise.all([memberOf(record.to_member), memberOf(record.from_member)])
+    const [creditor, payer, { data: group }] = await Promise.all([
+      memberOf(record.to_member), memberOf(record.from_member),
+      sb.from('groups').select('name').eq('id', record.group_id).single(),
+    ])
     if (creditor?.user_id === record.created_by) return new Response('self') // creditor recorded it themselves
     to = creditor?.user_id
     const amount = Number(record.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })
-    msg = { title: 'มีคนโอนเงินคืนให้คุณ', body: `${payer?.guest_name ?? payer?.profiles?.display_name ?? 'เพื่อน'} โอนให้คุณ ${amount} ${record.currency}`, url: `/g/${record.group_id}` }
+    msg = { title: group?.name ?? 'หารกัน', body: `${payer?.guest_name ?? payer?.profiles?.display_name ?? 'เพื่อน'} โอนคืนให้คุณ ${amount} ${record.currency}`, url: `/g/${record.group_id}` }
   } else return new Response('ignored')
   if (!to) return new Response('no account') // guests have no phone
 

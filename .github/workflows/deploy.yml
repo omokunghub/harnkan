@@ -1,0 +1,36 @@
+# Push to main (merging a PR) = deploy: tests, frontend, edge functions.
+# Repo secrets: CLOUDFLARE_API_TOKEN, SUPABASE_ACCESS_TOKEN. The VITE_ values below are public: they ship in the browser bundle.
+# SQL is NOT applied here: paste new migrations in the Supabase SQL Editor BEFORE merging.
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency: deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://oncuqybkluuifmvomwsh.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_KAvL1XE4-J1-Aa8DzVUBmA_y3oLeqCM
+      VITE_VAPID_PUBLIC_KEY: BKjTjsZJSyNBGk3RftfZ6LXasYBInrF6GqDNypyldj8gKgsETS6--sywMkDJhbimEE-u4uFJIHOk5TyrQ4X9230
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run
+      - run: npm run build
+      - name: Deploy frontend
+        run: npx wrangler pages deploy dist --project-name harnkan --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 860b051c710614a4ed70f5e294227322
+      - name: Deploy edge functions
+        run: |
+          npx -y supabase@3.1.0 functions deploy scan-receipt --project-ref oncuqybkluuifmvomwsh --use-api
+          npx -y supabase@3.1.0 functions deploy notify --project-ref oncuqybkluuifmvomwsh --use-api --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

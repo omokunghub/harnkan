@@ -10,7 +10,8 @@ Live: https://harnkan-7a6.pages.dev · Supabase project ref `oncuqybkluuifmvomws
 - **Supabase**: Postgres + RLS (all access control lives here), Auth (Google only), Storage, Realtime, Edge Functions.
 - **Edge function `scan-receipt`**: the only server code. Checks the caller is in a group, calls Gemini with a model
   fallback chain (`GEMINI_MODELS` secret, default flash-lite → flash → 2.5-flash-lite), returns JSON items with `details` and `box_2d`.
-- `supabase/functions/notify` (web push) exists but is **not set up yet** (no VAPID keys, no DB webhooks).
+- Edge function `notify`: web push, called by Database Webhooks on INSERT into `bill_notifies` and `settlements`.
+- `.github/workflows/deploy.yml`: push to main (= merging a PR) runs tests, then deploys the frontend and both edge functions. It does not apply SQL.
 - `.github/workflows/keepalive.yml` pings Supabase every 3 days so the free project doesn't pause.
 
 ## Commands
@@ -47,7 +48,7 @@ Run `npx vitest run` and `npm run build` before every commit.
   `lucide-react` (no emoji icons), Thai font Anuphan, touch targets ≥48px. For new UI, consult the project skill
   `.claude/skills/ui-ux-pro-max` (`python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain ux|style|color`).
 - Keep it minimal: no new dependencies without a strong reason, stdlib/native first, mark deliberate shortcuts with `// ponytail:`.
-- Git: commits use the GitHub noreply email (repo config already set). Ask before deploying — deploys are the owner's call.
+- Git: commits use the GitHub noreply email (repo config already set). Work on a branch and open a PR; **merging to main deploys**, so never push to main or merge unless the owner says so. If a PR needs SQL, say which file and have the owner run it BEFORE merging.
 
 ## Known gotchas
 - Android kills the PWA while the OS camera app is open → `Camera.tsx` uses an in-page getUserMedia camera.
