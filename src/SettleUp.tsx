@@ -1,10 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
-import type { Session } from '@supabase/supabase-js'
 import generatePayload from 'promptpay-qr'
 import QRCode from 'qrcode'
 import { FormHeader } from './FormHeader'
-import { active, CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, useSignedUrl, type Member } from './supabase'
+import { CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, useSignedUrl, type Member } from './supabase'
 
 // The payee's own QR image (bank app, TrueMoney, foreign wallets). Amount must be typed in their app.
 export function PaymentQR({ path, amountText }: { path?: string | null; amountText?: string }) {
@@ -30,7 +29,7 @@ export function PromptPayQR({ id, amount }: { id: string; amount: number }) {
   ) : null
 }
 
-export default function SettleUp({ session }: { session: Session }) {
+export default function SettleUp() {
   const { id } = useParams() as { id: string }
   const [q] = useSearchParams()
   const nav = useNavigate()
@@ -43,12 +42,11 @@ export default function SettleUp({ session }: { session: Session }) {
 
   useEffect(() => {
     sb.from('members').select(MEMBER_COLS).eq('group_id', id).then((r) => {
-      const ms = must(r) as unknown as Member[]
-      setMembers(active(ms))
-      setF((f) => ({ ...f, from_member: f.from_member || ms.find((m) => m.user_id === session.user.id)?.id || '' }))
+      setMembers(must(r) as unknown as Member[])
     })
-  }, [id, session.user.id])
+  }, [id])
 
+  const from = members.find((m) => m.id === f.from_member)
   const to = members.find((m) => m.id === f.to_member)
   const save = async (e: FormEvent) => {
     e.preventDefault()
@@ -71,19 +69,9 @@ export default function SettleUp({ session }: { session: Session }) {
 
   return (
     <main>
-      <FormHeader title="บันทึกการโอน" back={`/g/${id}`} formId="settle-form" dirty={dirty} disabled={busy || f.from_member === f.to_member} />
+      <FormHeader title="บันทึกการโอน" back={`/g/${id}`} formId="settle-form" dirty={dirty} disabled={busy || !from || !to} />
       <form id="settle-form" onSubmit={save} onChange={() => setDirty(true)} className="stack">
-        <label>ใครโอน
-          <select required value={f.from_member} onChange={(e) => setF({ ...f, from_member: e.target.value })}>
-            {members.map((m) => <option key={m.id} value={m.id}>{memberName(m)}</option>)}
-          </select>
-        </label>
-        <label>ให้ใคร
-          <select required value={f.to_member} onChange={(e) => setF({ ...f, to_member: e.target.value })}>
-            <option value="" />
-            {members.map((m) => <option key={m.id} value={m.id}>{memberName(m)}</option>)}
-          </select>
-        </label>
+        <p><b>{memberName(from)}</b> โอนให้ <b>{memberName(to)}</b></p>
         <div className="row">
           <label>จำนวน<input required type="number" step="any" min="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
           <label>สกุลเงิน
@@ -94,8 +82,8 @@ export default function SettleUp({ session }: { session: Session }) {
         </div>
         {f.currency === 'THB' && to?.profiles?.promptpay && Number(f.amount) > 0 && <PromptPayQR id={to.profiles.promptpay} amount={Number(f.amount)} />}
         <PaymentQR path={to?.profiles?.payment_qr_path} amountText={f.amount ? `${f.amount} ${f.currency}` : ''} />
+        {to && !to.profiles?.payment_qr_path && !(f.currency === 'THB' && to.profiles?.promptpay) && <p className="muted">{memberName(to)} ยังไม่มีการแนบ QR</p>}
         <label>แนบสลิป (ไม่บังคับ)<input type="file" accept="image/*" onChange={(e) => setSlip(e.target.files?.[0])} /></label>
-        {f.from_member && f.from_member === f.to_member && <p className="bad">คนโอนกับคนรับเป็นคนเดียวกัน</p>}
         {err && <p className="bad">{err}</p>}
       </form>
     </main>

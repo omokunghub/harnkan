@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, CalendarDays, CircleCheck, NotebookPen, Plus, ReceiptText, Settings, Trash2, Users } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, CalendarDays, ChevronRight, CircleCheck, NotebookPen, Plus, ReceiptText, Settings, Trash2, Users } from 'lucide-react'
+import { Link, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSignedUrl, type Member } from './supabase'
+import { Avatar } from './Avatar'
 import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { allocate, balances, convertNet, fmt, paidBy, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
@@ -13,13 +14,12 @@ type Row = { date: string; bill?: BillRow; settle?: SettlementRow }
 
 export default function GroupPage({ session }: { session: Session }) {
   const { id } = useParams() as { id: string }
-  const nav = useNavigate()
   const [group, setGroup] = useState<Group>()
   const [members, setMembers] = useState<Member[]>([])
   const [bills, setBills] = useState<BillRow[]>([])
   const [settles, setSettles] = useState<SettlementRow[]>([])
   const [log, setLog] = useState<Entry[]>([])
-  const [panel, setPanel] = useState<'' | 'balances'>('')
+  const [panel, setPanel] = useState<'' | 'balances' | 'pay'>('')
   const [viewCur, setViewCur] = useState<string>()
 
   // ponytail: loads every bill of the group to compute balances; paginate if a group reaches thousands of bills
@@ -56,7 +56,6 @@ export default function GroupPage({ session }: { session: Session }) {
   const myNet: (readonly [string, number])[] = one
     ? [[view, one.get(me?.id ?? '') ?? 0] as const].filter(([, v]) => v)
     : [...bal].map(([cur, net]) => [cur, net.get(me?.id ?? '') ?? 0] as const).filter(([, v]) => v)
-  const myMove = moves.find((mv) => mv.from === me?.id)
   const approx = estimate ? '≈ ' : ''
   const toView = (minor: number, cur: string) => (cur === view || !fx?.rates[cur] ? null : toMinor(toMajor(minor, cur) * fx.rates[cur], view))
 
@@ -111,12 +110,25 @@ export default function GroupPage({ session }: { session: Session }) {
       {estimate && <p className="muted fx-note">≈ ประมาณการจากเรทวันที่ {fx!.date} (ธนาคารกลางยุโรป) ยอดจริงในแต่ละบิลยังเป็นสกุลเดิม</p>}
 
       <div className="tabs">
-        <button className="ghost" onClick={() => nav(myMove
-          ? `/g/${id}/settle?from=${myMove.from}&to=${myMove.to}&amount=${toMajor(myMove.amount, myMove.cur)}&cur=${myMove.cur}`
-          : `/g/${id}/settle`)}>โอนคืน</button>
+        <button className={panel === 'pay' ? '' : 'ghost'} aria-expanded={panel === 'pay'}
+          onClick={() => setPanel(panel === 'pay' ? '' : 'pay')}>โอนคืน</button>
         <button className={panel === 'balances' ? '' : 'ghost'} aria-expanded={panel === 'balances'}
           onClick={() => setPanel(panel === 'balances' ? '' : 'balances')}>ยอดคงเหลือ</button>
       </div>
+
+      {panel === 'pay' && (
+        <section className="card" aria-label="ต้องโอนให้ใคร">
+          {moves.filter((mv) => mv.from === me?.id).map((mv) => (
+            <Link key={mv.cur + mv.to} className="line" to={`/g/${id}/settle?from=${mv.from}&to=${mv.to}&amount=${toMajor(mv.amount, mv.cur)}&cur=${mv.cur}`}>
+              <Avatar member={members.find((m) => m.id === mv.to)} size={40} />
+              <b className="grow">{name(mv.to)}</b>
+              <b className="owe">{approx}{fmt(mv.amount, mv.cur)}</b>
+              <ChevronRight size={20} aria-hidden />
+            </Link>
+          ))}
+          {!moves.some((mv) => mv.from === me?.id) && <p className="muted">คุณไม่มียอดต้องโอน</p>}
+        </section>
+      )}
 
       {panel === 'balances' && (
         <section className="card stack">

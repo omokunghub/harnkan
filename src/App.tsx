@@ -38,7 +38,7 @@ export default function App() {
         <Route path="/g/:id/edit" element={<EditGroup />} />
         <Route path="/g/:id/add" element={<AddExpense session={session} />} />
         <Route path="/b/:id/expense" element={<AddExpense session={session} />} />
-        <Route path="/g/:id/settle" element={<SettleUp session={session} />} />
+        <Route path="/g/:id/settle" element={<SettleUp />} />
         <Route path="/b/:id" element={<BillPage session={session} />} />
         <Route path="/b/:id/edit" element={<NewBill session={session} />} />
       </Routes>
