@@ -217,6 +217,9 @@ th { color: var(--muted); font-weight: 500; }
 .crop-view img { position: absolute; max-width: none; }
 .crop-modal { position: fixed; inset: 0; z-index: 10; background: rgba(0, 0, 0, .92); color: #fff; display: grid; grid-template-rows: auto 1fr auto; gap: var(--s2); padding: calc(var(--s3) + env(safe-area-inset-top)) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom)); }
 .crop-modal p { margin: 0; text-align: center; }
+.avatar-stage { position: relative; overflow: hidden; touch-action: none; justify-self: center; align-self: center; background: #000; cursor: grab; }
+.avatar-stage img { position: absolute; left: 50%; top: 50%; max-width: none; width: auto; height: auto; user-select: none; -webkit-user-drag: none; }
+.avatar-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 999px rgba(0, 0, 0, .55); pointer-events: none; }
 .crop-stage { position: relative; align-self: center; justify-self: center; touch-action: none; user-select: none; max-height: 100%; overflow: hidden; }
 .crop-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 160px); }
 .crop-rect { position: absolute; border: 2px solid #34d399; background: rgba(52, 211, 153, .2); pointer-events: none; }

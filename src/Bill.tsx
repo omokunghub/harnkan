@@ -3,7 +3,7 @@ import { ArrowLeft, Minus, Pencil, Plus, Scissors, Square, SquareCheck, Triangle
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedUrl, type Member } from './supabase'
-import { allocate, checkReceipt, fmt, paidBy, toMinor, UNCLAIMED, type Bill, type Item } from './money'
+import { allocate, checkReceipt, fmt, paidBy, shortName, toMinor, UNCLAIMED, type Bill, type Item } from './money'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
 import { CropEditor, CropView, type Box } from './Crop'
@@ -53,7 +53,8 @@ export default function BillPage({ session }: { session: Session }) {
   const who = tickFor ?? me?.id
   const simple = !bill.image_path && bill.bill_items.length === 1 // quick expense from AddExpense
   const taxed = bill.service_charge > 0 || bill.vat > 0 || bill.discount > 0
-  const name = (mid: string) => memberName(members.find((m) => m.id === mid))
+  const mem = (mid: string) => members.find((m) => m.id === mid)
+  const name = (mid: string) => shortName(memberName(mem(mid)))
   const payer = members.find((m) => m.id === bill.paid_by)
   const payers = paidBy(bill)
   const shares = allocate(bill)
@@ -105,19 +106,19 @@ export default function BillPage({ session }: { session: Session }) {
       </header>
       <Link className="pill" to={`${simple ? `/b/${id}/expense` : `/b/${id}/edit`}?payers=1`} aria-label="แก้คนจ่าย">
         {payers.length > 1
-          ? payers.map(([m, v]) => `${name(m)} จ่าย ${fmt(v, cur)}`).join(' · ')
-          : `${memberName(payer)} จ่าย ${fmt(toMinor(bill.grand_total, cur), cur)}`} <Pencil size={14} aria-hidden />
+          ? payers.map(([m, v]) => <span key={m} className="who"><Avatar member={mem(m)} size={24} />{name(m)} จ่าย {fmt(v, cur)}</span>)
+          : <span className="who"><Avatar member={payer} size={24} />{name(bill.paid_by)} จ่าย {fmt(toMinor(bill.grand_total, cur), cur)}</span>} <Pencil size={14} aria-hidden />
       </Link>
       {img && <a href={img} target="_blank"><img className="receipt" src={img} alt="ใบเสร็จ" /></a>}
 
       {!simple && <>
       {unclaimed.length > 0 && <p className="bad">ยังไม่มีคนเลือก {unclaimed.length} รายการ</p>}
-      {notYet.length > 0 && <p className="muted">ยังไม่ได้ติ๊ก: {notYet.map(memberName).join(', ')}</p>}
+      {notYet.length > 0 && <p className="muted">ยังไม่ได้ติ๊ก: {notYet.map((m) => name(m.id)).join(', ')}</p>}
       <div className="chips" role="group" aria-label="ติ๊กให้ใคร">
         <span className="muted">ติ๊กให้:</span>
         {active(members).map((m) => (
           <button key={m.id} className={m.id === who ? '' : 'ghost'} aria-pressed={m.id === who} onClick={() => setTickFor(m.id)}>
-            <Avatar member={m} size={24} /> {m.id === me?.id ? 'ฉัน' : memberName(m)}
+            <Avatar member={m} size={24} /> {m.id === me?.id ? 'ฉัน' : name(m.id)}
           </button>
         ))}
       </div>
@@ -204,7 +205,7 @@ export default function BillPage({ session }: { session: Session }) {
           <tbody>
             {shares.map((p) => (
               <tr key={p.member_id} className={p.member_id === me?.id ? 'mine' : p.member_id === UNCLAIMED ? 'bad' : ''}>
-                <td>{p.member_id === UNCLAIMED ? 'ยังไม่มีคนเลือก' : name(p.member_id)}</td>
+                <td>{p.member_id === UNCLAIMED ? 'ยังไม่มีคนเลือก' : <span className="who"><Avatar member={mem(p.member_id)} size={24} />{name(p.member_id)}</span>}</td>
                 {taxed && <><td>{fmt(p.net, cur)}</td><td>{fmt(p.sc, cur)}</td><td>{fmt(p.vat, cur)}</td></>}
                 {bill.discount > 0 && <td>−{fmt(p.discount, cur)}</td>}
                 <td><b>{fmt(p.total, cur)}</b></td>
@@ -218,11 +219,11 @@ export default function BillPage({ session }: { session: Session }) {
       {bill.vat_included && <p className="muted">ราคาในใบเสร็จรวม VAT แล้ว — ช่อง VAT คือส่วนที่รวมอยู่ ไม่ได้บวกเพิ่ม</p>}
 
       {mine && me && payer && me.id !== payer.id && payers.length === 1 && (
-        <p className="card mine">ส่วนของคุณในบิลนี้ <b>{fmt(mine.total, cur)}</b> (โอนคืน <b>{memberName(payer)}</b> ทีเดียวตอนเคลียร์ในหน้ากลุ่ม)</p>
+        <p className="card mine">ส่วนของคุณในบิลนี้ <b>{fmt(mine.total, cur)}</b> (โอนคืน <b>{name(payer.id)}</b> ทีเดียวตอนเคลียร์ในหน้ากลุ่ม)</p>
       )}
 
       <h2>คอมเมนต์</h2>
-      {comments.map((c) => <p key={c.id}><b>{name(c.member_id)}:</b> {c.body}</p>)}
+      {comments.map((c) => <p key={c.id}><span className="who"><Avatar member={mem(c.member_id)} size={24} /><b>{name(c.member_id)}:</b></span> {c.body}</p>)}
       <form onSubmit={comment} className="row">
         <input required maxLength={2000} placeholder="พิมพ์ข้อความ…" value={text} onChange={(e) => setText(e.target.value)} />
         <button>ส่ง</button>

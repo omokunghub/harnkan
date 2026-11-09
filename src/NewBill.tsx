@@ -7,7 +7,7 @@ import { CropView, cleanBox, type Box } from './Crop'
 import { Camera, canUseCamera } from './Camera'
 import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
-import { applyRates, checkReceipt, fmt, toMinor, type Bill } from './money'
+import { applyRates, checkReceipt, fmt, shortName, toMinor, type Bill } from './money'
 
 type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number; details: string; crop: Box | null }
 const newRow = (name = '', line_total = 0): Row => ({ id: crypto.randomUUID(), name, name_translated: '', qty: 1, line_total, details: '', crop: null })
@@ -112,7 +112,7 @@ export default function NewBill({ session }: { session: Session }) {
   }
 
   const me = members.find((mb) => mb.user_id === session.user.id)
-  const nameOf = (mb: Member) => (mb.id === me?.id ? 'คุณ' : memberName(mb))
+  const nameOf = (mb: Member) => (mb.id === me?.id ? 'คุณ' : shortName(memberName(mb)))
   const payerErr = checkPayers(payers, grandTotal, cur).error
 
   const save = async (e: FormEvent) => {

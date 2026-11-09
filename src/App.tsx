@@ -4,6 +4,7 @@ import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'reac
 import type { Session } from '@supabase/supabase-js'
 import { BILL_COLS, must, sb, shrink, useSession } from './supabase'
 import { Avatar } from './Avatar'
+import { AvatarCropper } from './Crop'
 import { PaymentQR } from './SettleUp'
 import { balances, fmt } from './money'
 import AddExpense from './AddExpense'
@@ -129,6 +130,7 @@ function Profile({ session }: { session: Session }) {
   const [p, setP] = useState({ display_name: '', promptpay: '', avatar_url: null as string | null, payment_qr_path: null as string | null })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [cropping, setCropping] = useState<File>()
   const uid = session.user.id
   const meta = session.user.user_metadata
   const googlePic: string | null = meta.avatar_url ?? meta.picture ?? null
@@ -142,12 +144,11 @@ function Profile({ session }: { session: Session }) {
     setP((x) => ({ ...x, avatar_url }))
     if (old?.includes('/avatars/')) await sb.storage.from('avatars').remove([old.split('/avatars/')[1]]) // our own upload
   }
-  const upload = async (file?: File) => {
-    if (!file) return
-    setBusy(true); setMsg('')
+  const upload = async (photo: Blob) => {
+    setCropping(undefined); setBusy(true); setMsg('')
     try {
       const path = `${uid}/${Date.now()}.jpg`
-      must(await sb.storage.from('avatars').upload(path, await shrink(file, 256), { contentType: 'image/jpeg' }))
+      must(await sb.storage.from('avatars').upload(path, photo, { contentType: 'image/jpeg' }))
       await setAvatar(sb.storage.from('avatars').getPublicUrl(path).data.publicUrl)
       setMsg('เปลี่ยนรูปแล้ว')
     } catch (e) {
@@ -189,7 +190,7 @@ function Profile({ session }: { session: Session }) {
         <Avatar url={p.avatar_url} name={p.display_name || '?'} size={96} />
         <label className="button ghost">
           {busy ? 'กำลังอัปโหลด…' : 'เปลี่ยนรูปโปรไฟล์'}
-          <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => upload(e.target.files?.[0])} />
+          <input hidden type="file" accept="image/*" disabled={busy} onChange={(e) => { setCropping(e.target.files?.[0]); e.target.value = '' }} />
         </label>
         {googlePic && p.avatar_url !== googlePic && (
           <button type="button" className="ghost" onClick={() => setAvatar(googlePic)}>ใช้รูปจาก Google</button>
@@ -218,6 +219,7 @@ function Profile({ session }: { session: Session }) {
       <button className="ghost" onClick={push}>เปิดแจ้งเตือนบิลใหม่</button>
       <button className="ghost" onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}
+      {cropping && <AvatarCropper file={cropping} onDone={upload} onClose={() => setCropping(undefined)} />}
     </main>
   )
 }

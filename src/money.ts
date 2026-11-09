@@ -41,6 +41,17 @@ export function splitExact(total: number, weights: Map<string, number>) {
   return out
 }
 
+// Tight spots: "Teerawat Thamrongdullapark" → "Teerawat T.". Names up to 14 visible characters stay whole
+// (≈ 120px at 16px, a third of a 375px phone); Thai vowel/tone marks take no width so they don't count.
+export function shortName(full: string, max = 14): string {
+  const name = full.trim().replace(/\s+/g, ' ')
+  if (name.replace(/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/g, '').length <= max) return name
+  const words = name.split(' ')
+  if (words.length === 1) return [...name].slice(0, max - 1).join('') + '…'
+  const first = shortName(words[0], max - 3) // room for " X."
+  return `${first} ${[...words.at(-1)!.replace(/^[เแโใไ]/, '')][0]}.` // Thai leading vowels aren't the initial
+}
+
 // Each person's share of the bill. Proportional to the items they ticked, applied to the printed
 // grand total, so it works whatever order the shop applies SC/VAT/discount in.
 // Items nobody ticked go to UNCLAIMED.

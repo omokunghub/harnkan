@@ -6,7 +6,7 @@ import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSign
 import { Avatar } from './Avatar'
 import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
-import { allocate, balances, convertNet, fmt, paidBy, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
+import { allocate, balances, convertNet, fmt, paidBy, shortName, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
 
 type BillRow = Bill & { id: string; title: string; spent_on: string; image_path: string | null }
 type SettlementRow = Settlement & { id: string; slip_path: string | null; created_at: string }
@@ -40,7 +40,8 @@ export default function GroupPage({ session }: { session: Session }) {
   const view = viewCur ?? group?.currency ?? 'THB'
   const fx = useRates(view)
   if (!group) return null
-  const name = (mid: string) => memberName(members.find((m) => m.id === mid))
+  const mem = (mid: string) => members.find((m) => m.id === mid)
+  const name = (mid: string) => shortName(memberName(mem(mid)))
   const me = members.find((m) => m.user_id === session.user.id)
   const you = (mid: string) => (mid === me?.id ? 'คุณ' : name(mid))
   const bal = balances(bills, settles)
@@ -93,8 +94,8 @@ export default function GroupPage({ session }: { session: Session }) {
           {moves.filter((mv) => mv.from === me?.id || mv.to === me?.id).map((mv) => (
             <li key={mv.from + mv.to + mv.cur}>
               {mv.from === me?.id ? <Link to={`/g/${id}/settle?from=${mv.from}&to=${mv.to}&amount=${toMajor(mv.amount, mv.cur)}&cur=${mv.cur}`}>
-                ติด <b>{name(mv.to)}</b> <span className="owe">{approx}{fmt(mv.amount, mv.cur)}</span> — โอนเลย
-              </Link> : <><b>{name(mv.from)}</b> ติดคุณ <span className="good">{approx}{fmt(mv.amount, mv.cur)}</span></>}
+                ติด <span className="who"><Avatar member={mem(mv.to)} size={24} /><b>{name(mv.to)}</b></span> <span className="owe">{approx}{fmt(mv.amount, mv.cur)}</span> — โอนเลย
+              </Link> : <><span className="who"><Avatar member={mem(mv.from)} size={24} /><b>{name(mv.from)}</b></span> ติดคุณ <span className="good">{approx}{fmt(mv.amount, mv.cur)}</span></>}
             </li>
           ))}
         </ul>
@@ -120,7 +121,7 @@ export default function GroupPage({ session }: { session: Session }) {
         <section className="card" aria-label="ต้องโอนให้ใคร">
           {moves.filter((mv) => mv.from === me?.id).map((mv) => (
             <Link key={mv.cur + mv.to} className="line" to={`/g/${id}/settle?from=${mv.from}&to=${mv.to}&amount=${toMajor(mv.amount, mv.cur)}&cur=${mv.cur}`}>
-              <Avatar member={members.find((m) => m.id === mv.to)} size={40} />
+              <Avatar member={mem(mv.to)} size={40} />
               <b className="grow">{name(mv.to)}</b>
               <b className="owe">{approx}{fmt(mv.amount, mv.cur)}</b>
               <ChevronRight size={20} aria-hidden />
@@ -134,7 +135,7 @@ export default function GroupPage({ session }: { session: Session }) {
         <section className="card stack">
           {moves.map(({ cur, from, to, amount }) => (
             <div key={cur + from + to} className={`row ${from === me?.id || to === me?.id ? 'mine' : ''}`}>
-              <span>{you(from)} ต้องโอนให้ {you(to)} <b>{approx}{fmt(amount, cur)}</b></span>
+              <span><Avatar member={mem(from)} size={24} /> {you(from)} ต้องโอนให้ <Avatar member={mem(to)} size={24} /> {you(to)} <b>{approx}{fmt(amount, cur)}</b></span>
               <Link to={`/g/${id}/settle?from=${from}&to=${to}&amount=${toMajor(amount, cur)}&cur=${cur}`}>โอนแล้ว</Link>
             </div>
           ))}

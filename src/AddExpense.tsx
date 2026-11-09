@@ -6,7 +6,7 @@ import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type 
 import { Avatar } from './Avatar'
 import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers } from './Payers'
-import { detectSplit, fmt, splitWeights, toMinor, type SplitMode } from './money'
+import { detectSplit, fmt, shortName, splitWeights, toMinor, type SplitMode } from './money'
 
 const MODES: [SplitMode, string][] = [['equal', 'เท่ากัน'], ['exact', 'กำหนดยอด'], ['percent', 'เปอร์เซ็นต์'], ['shares', 'จำนวนส่วน']]
 const today = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD in local time
@@ -58,7 +58,7 @@ export default function AddExpense({ session }: { session: Session }) {
   const { weights, error } = splitWeights(mode, total, values, cur)
   const chosen = Object.keys(weights).length
   const me = members.find((m) => m.user_id === session.user.id)
-  const nameOf = (m: Member) => (m.id === me?.id ? 'คุณ' : memberName(m))
+  const nameOf = (m: Member) => (m.id === me?.id ? 'คุณ' : shortName(memberName(m)))
   const setMode2 = (m: SplitMode) => {
     setMode(m)
     setValues(Object.fromEntries(members.map((mb) => [mb.id, m === 'equal' || m === 'shares' ? 1 : 0])))

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { allocate, applyRates, balances, checkReceipt, convertNet, detectSplit, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
+import { allocate, applyRates, balances, checkReceipt, convertNet, detectSplit, shortName, simplify, splitExact, splitWeights, UNCLAIMED, type Bill } from './money'
 
 const sh = (...ms: string[]) => ms.map((member_id) => ({ member_id, weight: 1 }))
 const bill = (p: Partial<Bill>): Bill => ({
@@ -135,4 +135,13 @@ test('same dish ×3: one person had 2, another had 1', () => {
   const b = bill({ grand_total: 300, bill_items: [{ line_total: 300, item_shares: [{ member_id: 'a', weight: 2 }, { member_id: 'b', weight: 1 }] }] })
   const p = byMember(b)
   expect([p.a.total, p.b.total]).toEqual([20000, 10000])
+})
+
+test('shortName only shortens long names', () => {
+  expect(shortName('brotheroam')).toBe('brotheroam')
+  expect(shortName('Krai Tan')).toBe('Krai Tan')
+  expect(shortName('Teerawat Thamrongdullapark')).toBe('Teerawat T.')
+  expect(shortName('สมชาย เจริญรุ่งเรืองกิจ')).toBe('สมชาย จ.')
+  expect(shortName('Anna Maria van der Berg')).toBe('Anna B.')
+  expect(shortName('Abcdefghijklmnopqrstuvwxyz')).toBe('Abcdefghijklm…')
 })
