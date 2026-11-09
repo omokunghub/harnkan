@@ -30,7 +30,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: 860b051c710614a4ed70f5e294227322
       - name: Deploy edge functions
         run: |
-          npx -y supabase@3.1.0 functions deploy scan-receipt --project-ref oncuqybkluuifmvomwsh --use-api
-          npx -y supabase@3.1.0 functions deploy notify --project-ref oncuqybkluuifmvomwsh --use-api --no-verify-jwt
+          npx -y supabase@3.1.0 functions deploy scan-receipt --project-ref oncuqybkluuifmvomwsh --use-api --yes
+          npx -y supabase@3.1.0 functions deploy notify --project-ref oncuqybkluuifmvomwsh --use-api --no-verify-jwt --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
