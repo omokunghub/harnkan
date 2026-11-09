@@ -33,6 +33,7 @@ export function GroupSettings({ session }: { session: Session }) {
   const [net, setNet] = useState<Map<string, Map<string, number>>>(new Map())
   const [guest, setGuest] = useState('')
   const [adding, setAdding] = useState(false)
+  const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null }[]>() // admin: add without a link
   const [mergeFor, setMergeFor] = useState<Member>() // guest being deleted / handed over
   const [into, setInto] = useState('')
   const admin = useIsAdmin()
@@ -53,6 +54,11 @@ export function GroupSettings({ session }: { session: Session }) {
     e.preventDefault()
     must(await sb.from('members').insert({ group_id: id, guest_name: guest.trim() }))
     setGuest(''); setAdding(false); load()
+  }
+  const listPeople = async () => setPeople(people ? undefined : must(await sb.rpc('admin_list_users', { g: id })) as NonNullable<typeof people>)
+  const addPerson = async (u: string) => {
+    must(await sb.rpc('admin_add_member', { g: id, u }))
+    setPeople(people?.filter((p) => p.id !== u)); load()
   }
   const remove = async (m: Member, owes: boolean) => {
     const warn = owes ? '\n\n⚠ คนนี้ยังมียอดค้างอยู่ ควรเคลียร์ก่อน' : ''
@@ -102,6 +108,17 @@ export function GroupSettings({ session }: { session: Session }) {
           <button>เพิ่ม</button>
         </form>
       )}
+      {admin && (
+        <button className="list-row" aria-expanded={!!people} onClick={listPeople}>
+          <span className="row-icon" aria-hidden><UserPlus size={24} /></span>เพิ่มเพื่อนที่มีบัญชีแล้ว (ไม่ต้องส่งลิงก์)
+        </button>
+      )}
+      {people?.map((p) => (
+        <button key={p.id} className="list-row" onClick={() => addPerson(p.id)}>
+          <Avatar url={p.avatar_url} name={p.display_name} size={40} />{p.display_name}
+        </button>
+      ))}
+      {people?.length === 0 && <p className="muted">ทุกคนที่เคยล็อกอินอยู่ในกลุ่มนี้แล้ว</p>}
       <button className="list-row" onClick={() => share(`เข้ากลุ่ม ${group.name} ในหารกัน`, `${location.origin}/join/${group.invite_code}`)}>
         <span className="row-icon" aria-hidden><Link2 size={24} /></span>ชวนเพื่อนด้วยลิงก์
       </button>

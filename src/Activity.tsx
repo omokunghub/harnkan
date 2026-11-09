@@ -29,6 +29,7 @@ function describe(e: Entry, name: (memberId: string) => string, actorMember?: Me
     case 'share_update': return `เปลี่ยนส่วนของ ${name(d.member)} ใน "${d.item}" เป็น ×${d.weight}`
     case 'settle_add': return `บันทึกว่า ${name(d.from)} โอนให้ ${name(d.to)} ${n(d.amount)} ${d.currency}`
     case 'settle_remove': return `ลบการโอน ${name(d.from)} → ${name(d.to)} ${n(d.amount)} ${d.currency}`
+    case 'member_add': return `เพิ่ม ${name(d.member)} เข้ากลุ่ม`
     case 'member_remove': return `เอา ${name(d.member)} ออกจากกลุ่ม`
     case 'invite_reset': return 'เปลี่ยนลิงก์เชิญ'
     case 'guest_merge': return d.into ? `ย้ายยอดของ ${d.guest} (guest) ไปให้ ${name(d.into)} แล้วลบ ${d.guest}` : `ลบ guest ${d.guest}`

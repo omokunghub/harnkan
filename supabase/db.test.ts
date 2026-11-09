@@ -281,3 +281,25 @@ test('hiding a trip only changes your own row', async () => {
   await as(A, `select set_group_hidden($1, false)`, [g])
   expect(await hidden()).toEqual([])
 })
+
+test('only the admin can list users and add them to a group without a link', async () => {
+  const { q, as } = await setup()
+  await q(`insert into app_admins (user_id) values ($1)`, [A])
+  const [{ id: g }] = await as(A, `select create_group('trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g])
+  await as(B, `select join_group($1)`, [invite_code])
+
+  expect(await as(B, `select * from admin_list_users($1)`, [g])).toHaveLength(0) // non-admin member sees nobody
+  await expect(as(B, `select admin_add_member($1, $2)`, [g, C])).rejects.toThrow('admin only')
+  expect((await as(A, `select id from admin_list_users($1)`, [g])).map((r) => r.id)).toEqual([C]) // already-in people left out
+
+  await as(A, `select admin_add_member($1, $2)`, [g, C])
+  expect(await as(C, `select id from groups where id = $1`, [g])).toHaveLength(1)
+  expect(await as(A, `select id from admin_list_users($1)`, [g])).toHaveLength(0)
+  expect(await q(`select * from activity where action = 'member_add'`)).toHaveLength(1)
+
+  const [{ id: mC }] = await q(`select id from members where user_id = $1`, [C])
+  await as(A, `select remove_member($1)`, [mC])
+  await as(A, `select admin_add_member($1, $2)`, [g, C]) // a removed friend comes back on the same row
+  expect(await q(`select removed_at from members where id = $1`, [mC])).toEqual([{ removed_at: null }])
+})
