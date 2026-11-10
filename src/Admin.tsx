@@ -8,7 +8,10 @@ import { ActivityLog, type Entry } from './Activity'
 import { GroupIcon, type Group } from './GroupSettings'
 
 // Admin-only monitor. The data comes from security-definer RPCs that check is_admin(); these pages just render it.
-type User = { id: string; display_name: string; avatar_url: string | null; email: string; last_sign_in_at: string | null; trips: number }
+type User = { id: string; display_name: string; avatar_url: string | null; email: string; last_sign_in_at: string | null; trips: number
+  push_hosts: string[]; promptpay: boolean; payment_qr: boolean; hidden: number }
+// The push service host tells which kind of device turned notifications on.
+const device = (h: string) => h.includes('apple') ? 'iPhone/iPad' : h.includes('google') ? 'Android/Chrome' : h.includes('windows') ? 'Windows' : h.includes('mozilla') ? 'Firefox' : h
 type Trip = { id: string; name: string; type: string; cover_url: string | null; members: number; bills: number }
 type BillRow = Bill & { id: string; title: string }
 type Data = { group: Group; members: Member[]; bills: BillRow[]; activity: Entry[] }
@@ -56,7 +59,11 @@ export function AdminHome() {
           <span className="grow">
             <b>{u.display_name || '(ไม่มีชื่อ)'}</b>
             <small className="muted">{u.email}</small>
-            <small className="muted">อยู่ {u.trips} ทริป · เข้าล่าสุด {date(u.last_sign_in_at)}</small>
+            <small className="muted">อยู่ {u.trips} ทริป{u.hidden ? ` (ซ่อน ${u.hidden})` : ''} · เข้าล่าสุด {date(u.last_sign_in_at)}</small>
+            <small className="muted">
+              แจ้งเตือน {u.push_hosts.length ? `${u.push_hosts.length} เครื่อง (${[...new Set(u.push_hosts.map(device))].join(', ')})` : 'ปิด'}
+              {' · '}PromptPay {u.promptpay ? 'มี' : 'ไม่มี'} · QR {u.payment_qr ? 'มี' : 'ไม่มี'}
+            </small>
           </span>
         </div>
       ))}

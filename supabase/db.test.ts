@@ -316,6 +316,10 @@ test('admin monitor sees every user and trip, read-only; nobody else sees anythi
   await as(B, `insert into item_shares (item_id, member_id) values ($1, $2)`, [item, mB])
 
   expect(await as(A, `select id from admin_users()`)).toHaveLength(3)
+  await q(`insert into push_subs (endpoint, user_id, sub) values ('https://web.push.apple.com/x', $1, '{}')`, [B])
+  await q(`update profiles set promptpay = '0812345678' where id = $1`, [B])
+  expect(await as(A, `select push_hosts, promptpay, payment_qr, hidden from admin_users() where id = $1`, [B]))
+    .toEqual([{ push_hosts: ['web.push.apple.com'], promptpay: true, payment_qr: false, hidden: 0 }])
   expect(await as(A, `select name, members, bills from admin_groups()`)).toEqual([{ name: 'B trip', members: 1, bills: 1 }])
   const [{ d }] = await as(A, `select admin_group($1) as d`, [g])
   expect(d.group.name).toBe('B trip')
