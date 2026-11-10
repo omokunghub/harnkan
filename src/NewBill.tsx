@@ -36,6 +36,8 @@ export default function NewBill({ session }: { session: Session }) {
   const [imagePath, setImagePath] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState('') // shown on the save button
+  const [saveErr, setSaveErr] = useState('')
   const [payers, setPayers] = useState<Payers>({})
   const [showPayers, setShowPayers] = useState(q.has('payers'))
   const [dirty, setDirty] = useState(false)
@@ -118,7 +120,8 @@ export default function NewBill({ session }: { session: Session }) {
   const save = async (e: FormEvent) => {
     e.preventDefault()
     if (payerErr) return setShowPayers(true)
-    setBusy(true)
+    setBusy(true); setSaveErr('')
+    setSaving(blob && !imagePath ? 'กำลังอัปโหลดรูปใบเสร็จ…' : 'กำลังบันทึก…')
     const billId = editing ?? crypto.randomUUID()
     const row = { ...f, paid_by: mainPayer(payers, f.paid_by), currency: cur, grand_total: grandTotal, group_id: groupId, image_path: imagePath }
     const itemRows = items.map((i, position) => ({ ...i, bill_id: billId, position }))
@@ -126,6 +129,7 @@ export default function NewBill({ session }: { session: Session }) {
       if (blob && !imagePath) {
         row.image_path = `${groupId}/${billId}.jpg`
         must(await sb.storage.from('receipts').upload(row.image_path, blob, { contentType: 'image/jpeg' }))
+        setSaving('กำลังบันทึก…')
       }
       if (editing) {
         must(await sb.from('bills').update(row).eq('id', billId))
@@ -140,8 +144,8 @@ export default function NewBill({ session }: { session: Session }) {
       await savePayers(billId, payers)
       nav(`/b/${billId}`, { replace: true })
     } catch (err) {
-      setStatus(`บันทึกไม่สำเร็จ: ${(err as Error).message}`)
-      setBusy(false)
+      setSaveErr(`บันทึกไม่สำเร็จ: ${(err as Error).message} — ลองกดอีกครั้ง`)
+      setSaving(''); setBusy(false)
     }
   }
 
@@ -242,7 +246,9 @@ export default function NewBill({ session }: { session: Session }) {
             {f.discount ? ` − ส่วนลด ${m(f.discount)}` : ''} = <b>{m(grandTotal)}</b>
           </p>
           {warnings.map((w) => <p key={w} className="bad"><TriangleAlert size={16} aria-hidden /> {w}</p>)}
-          <button disabled={busy || !items.length || !groupId}>{editing ? 'บันทึก' : 'โพสต์บิล แล้วไปติ๊กรายการ'}</button>
+          {saveErr && <p className="bad" role="alert">{saveErr}</p>}
+          <button disabled={busy || !items.length || !groupId}>{saving || (editing ? 'บันทึก' : 'โพสต์บิล แล้วไปติ๊กรายการ')}</button>
+          {saving && <p className="muted" role="status">อย่าเพิ่งปิดหน้านี้ เสร็จแล้วจะไปหน้าบิลเอง</p>}
         </form>
       )}
     </main>

@@ -51,7 +51,7 @@ export default function SettleUp() {
   const save = async (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
-    setBusy(true)
+    setBusy(true); setErr('')
     try {
       const sid = crypto.randomUUID()
       let slip_path = null
@@ -84,7 +84,9 @@ export default function SettleUp() {
         <PaymentQR path={to?.profiles?.payment_qr_path} amountText={f.amount ? `${f.amount} ${f.currency}` : ''} />
         {to && !to.profiles?.payment_qr_path && !(f.currency === 'THB' && to.profiles?.promptpay) && <p className="muted">{memberName(to)} ยังไม่มีการแนบ QR</p>}
         <label>แนบสลิป (ไม่บังคับ)<input type="file" accept="image/*" onChange={(e) => setSlip(e.target.files?.[0])} /></label>
-        {err && <p className="bad">{err}</p>}
+        {err && <p className="bad" role="alert">บันทึกไม่สำเร็จ: {err} — ลองกดอีกครั้ง</p>}
+        <button disabled={busy || !from || !to}>{busy ? (slip ? 'กำลังอัปโหลดสลิป…' : 'กำลังบันทึก…') : 'บันทึกการโอน'}</button>
+        {busy && <p className="muted" role="status">อย่าเพิ่งปิดหน้านี้ เสร็จแล้วจะกลับไปหน้าทริปเอง</p>}
       </form>
     </main>
   )
