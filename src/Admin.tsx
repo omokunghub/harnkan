@@ -10,7 +10,7 @@ import { GroupIcon, type Group } from './GroupSettings'
 // Admin-only monitor. The data comes from security-definer RPCs that check is_admin(); these pages just render it.
 type User = { id: string; display_name: string; avatar_url: string | null; email: string; last_sign_in_at: string | null; trips: number }
 type Trip = { id: string; name: string; type: string; cover_url: string | null; members: number; bills: number }
-type BillRow = Bill & { id: string; title: string; created_by: string }
+type BillRow = Bill & { id: string; title: string }
 type Data = { group: Group; members: Member[]; bills: BillRow[]; activity: Entry[] }
 
 const date = (d: string | null) => (d ? new Date(d).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่เคย')
@@ -76,49 +76,47 @@ export function AdminTrip() {
   if (!d) return null
 
   const name = (mid: string) => memberName(d.members.find((m) => m.id === mid))
-  const byUser = (uid: string) => memberName(d.members.find((m) => m.user_id === uid)).replace(/^\?$/, 'อดีตสมาชิก')
   const total = (b: BillRow) => toMinor(b.grand_total, b.currency)
   // ponytail: biggest bill compared at today's rate; bills keep their own currency on screen
   const inBase = (b: BillRow) => toMajor(total(b), b.currency) * (b.currency === d.group.currency ? 1 : fx?.rates[b.currency] ?? 1)
   const biggest = d.bills.reduce<BillRow | undefined>((x, b) => (!x || inBase(b) > inBase(x) ? b : x), undefined)
 
-  const opened = new Map<string, Map<string, number>>(), count = new Map<string, number>()
-  const share = new Map<string, Map<string, number>>(), paid = new Map<string, Map<string, number>>()
+  // Who actually paid, not who typed the bill in: a bill split between payers counts for each of them.
+  const paid = new Map<string, Map<string, number>>(), count = new Map<string, number>()
+  const share = new Map<string, Map<string, number>>()
   for (const b of d.bills) {
-    add(opened, b.created_by, b.currency, total(b))
-    count.set(b.created_by, (count.get(b.created_by) ?? 0) + 1)
     for (const p of allocate(b)) add(share, p.member_id === UNCLAIMED ? b.paid_by : p.member_id, b.currency, p.total)
-    for (const [m, v] of paidBy(b)) add(paid, m, b.currency, v)
+    for (const [m, v] of paidBy(b)) { add(paid, m, b.currency, v); count.set(m, (count.get(m) ?? 0) + 1) }
   }
-  const openers = [...count].sort((a, b) => b[1] - a[1])
-  const top = openers[0]
+  const payers = [...count].sort((a, b) => b[1] - a[1])
+  const top = payers[0]
 
   return (
     <main>
       <Top title={d.group.name} back="/admin" />
       <p className="muted">{d.bills.length} บิล · สมาชิก {d.members.filter((m) => !m.removed_at).length} คน</p>
 
-      <h2>เปิดบิลมากที่สุด</h2>
-      {top ? <p><b>{byUser(top[0])}</b> {top[1]} บิล รวม {sum(opened.get(top[0]))}</p> : <p className="muted">ยังไม่มีบิล</p>}
+      <h2>จ่ายบิลมากที่สุด</h2>
+      {top ? <p><b>{name(top[0])}</b> {top[1]} บิล รวม {sum(paid.get(top[0]))}</p> : <p className="muted">ยังไม่มีบิล</p>}
 
       <h2>บิลสูงสุด</h2>
       {biggest ? <p><b>{biggest.title}</b> {fmt(total(biggest), biggest.currency)} · {name(biggest.paid_by)} จ่าย</p> : <p className="muted">ยังไม่มีบิล</p>}
 
-      <h2>แต่ละคนเปิดบิล</h2>
+      <h2>แต่ละคนจ่ายบิล</h2>
       <table>
-        <thead><tr><th>คน</th><th>บิล</th><th>ยอดรวม</th></tr></thead>
-        <tbody>{openers.map(([uid, n]) => (
-          <tr key={uid}><td>{byUser(uid)}</td><td>{n}</td><td>{sum(opened.get(uid))}</td></tr>
+        <thead><tr><th>คน</th><th>บิล</th><th>จ่ายไปรวม</th></tr></thead>
+        <tbody>{payers.map(([mid, n]) => (
+          <tr key={mid}><td>{name(mid)}</td><td>{n}</td><td>{sum(paid.get(mid))}</td></tr>
         ))}</tbody>
       </table>
 
       <h2>แต่ละคนใช้จ่าย</h2>
       <table>
-        <thead><tr><th>คน</th><th>ส่วนของตัวเอง</th><th>ออกเงินไป</th></tr></thead>
+        <thead><tr><th>คน</th><th>ส่วนของตัวเอง</th></tr></thead>
         <tbody>{d.members.map((m) => (
           <tr key={m.id}>
             <td><span className="who"><Avatar member={m} size={24} />{memberName(m)}{m.removed_at ? ' (ออกแล้ว)' : ''}</span></td>
-            <td>{sum(share.get(m.id))}</td><td>{sum(paid.get(m.id))}</td>
+            <td>{sum(share.get(m.id))}</td>
           </tr>
         ))}</tbody>
       </table>
