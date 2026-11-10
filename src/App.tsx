@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, Bell, BellOff, CircleCheck, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, CircleCheck, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, fetchRates, must, sb, shrink, useSession } from './supabase'
+import { BILL_COLS, fetchRates, must, sb, shrink, useIsAdmin, useSession } from './supabase'
 import { Avatar } from './Avatar'
 import { AvatarCropper } from './Crop'
 import { PaymentQR } from './SettleUp'
@@ -13,6 +13,7 @@ import GroupPage from './Group'
 import NewBill from './NewBill'
 import BillPage from './Bill'
 import SettleUp from './SettleUp'
+import { AdminHome, AdminTrip } from './Admin'
 
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window))
@@ -46,6 +47,8 @@ export default function App() {
         <Route path="/" element={<Groups session={session} />} />
         <Route path="/join/:code" element={<Join />} />
         <Route path="/me" element={<Profile session={session} />} />
+        <Route path="/admin" element={<AdminHome />} />
+        <Route path="/admin/g/:id" element={<AdminTrip />} />
         <Route path="/g/:id" element={<GroupPage session={session} />} />
         <Route path="/g/:id/new" element={<NewBill session={session} />} />
         <Route path="/g/:id/settings" element={<GroupSettings session={session} />} />
@@ -251,6 +254,7 @@ function Profile({ session }: { session: Session }) {
     must(await sb.from('profiles').update({ display_name: p.display_name.trim(), promptpay: p.promptpay || null }).eq('id', uid))
     setMsg('บันทึกแล้ว')
   }
+  const admin = useIsAdmin()
   const [pushOn, setPushOn] = useState(false)
   useEffect(() => { pushSub().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
   const push = async () => {
@@ -300,6 +304,7 @@ function Profile({ session }: { session: Session }) {
         {p.payment_qr_path && <button type="button" className="ghost" disabled={busy} onClick={() => setQr()}>ลบ QR</button>}
       </div>
       <button className="ghost" style={{ width: '100%' }} disabled={busy} aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
+      {admin && <Link className="button ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} to="/admin"><ShieldCheck size={20} aria-hidden /> หน้าผู้ดูแล</Link>}
       <button className="ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}
       {cropping && <AvatarCropper file={cropping} onDone={upload} onClose={() => setCropping(undefined)} />}
