@@ -11,7 +11,7 @@ async function setup() {
   const db = new PGlite()
   await db.exec(`
     create role anon; create role authenticated;
-    create schema auth; create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
+    create schema auth; create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', last_sign_in_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.uid', true), '')::uuid $$;
     create schema storage; create table storage.buckets (id text primary key, name text, public bool);
     create table storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text);
@@ -302,4 +302,26 @@ test('only the admin can list users and add them to a group without a link', asy
   await as(A, `select remove_member($1)`, [mC])
   await as(A, `select admin_add_member($1, $2)`, [g, C]) // a removed friend comes back on the same row
   expect(await q(`select removed_at from members where id = $1`, [mC])).toEqual([{ removed_at: null }])
+})
+
+test('admin monitor sees every user and trip, read-only; nobody else sees anything', async () => {
+  const { q, as } = await setup()
+  await q(`insert into app_admins (user_id) values ($1)`, [A])
+  const [{ id: g }] = await as(B, `select create_group('B trip') as id`) // admin A is not a member
+  const [{ id: mB }] = await q(`select id from members where user_id = $1`, [B])
+  const [{ id: bill }] = await as(B, `insert into bills (group_id, paid_by, title, grand_total) values ($1, $2, 'Dinner', 100) returning id`, [g, mB])
+  const [{ id: item }] = await as(B, `insert into bill_items (bill_id, name, line_total) values ($1, 'Rice', 100) returning id`, [bill])
+  await as(B, `insert into item_shares (item_id, member_id) values ($1, $2)`, [item, mB])
+
+  expect(await as(A, `select id from admin_users()`)).toHaveLength(3)
+  expect(await as(A, `select name, members, bills from admin_groups()`)).toEqual([{ name: 'B trip', members: 1, bills: 1 }])
+  const [{ d }] = await as(A, `select admin_group($1) as d`, [g])
+  expect(d.group.name).toBe('B trip')
+  expect(d.bills[0].bill_items[0].item_shares).toEqual([{ item_id: item, member_id: mB, weight: 1 }])
+  expect(d.members[0].profiles.display_name).toBe('Bob')
+  expect(d.activity.length).toBeGreaterThan(0)
+
+  expect(await as(B, `select * from admin_users()`)).toHaveLength(0)
+  expect(await as(B, `select * from admin_groups()`)).toHaveLength(0)
+  await expect(as(B, `select admin_group($1)`, [g])).rejects.toThrow('admin only')
 })

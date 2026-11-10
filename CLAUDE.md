@@ -31,7 +31,8 @@ Run `npx vitest run` and `npm run build` before every commit.
 - `src/supabase.ts` — client, MEMBER_COLS/BILL_COLS, hooks (useSession, useSignedUrl, useRates, useIsAdmin), shrink(), CURRENCIES.
 - Pages: `App.tsx` (routes, home, join, account settings), `Group.tsx` (timeline, balances, currency toggle),
   `GroupSettings.tsx` (members+balances, admin actions, EditGroup), `AddExpense.tsx` (quick expense, split modes),
-  `NewBill.tsx` (scan/edit receipt), `Bill.tsx` (tick items, ✏️ edit, ✂️ crop, comments), `SettleUp.tsx` (+ PromptPay/QR).
+  `NewBill.tsx` (scan/edit receipt), `Bill.tsx` (tick items, ✏️ edit, ✂️ crop, comments), `SettleUp.tsx` (+ PromptPay/QR),
+  `Admin.tsx` (admin-only monitor: all users, per-trip stats + full log, via `admin_*` RPCs).
 - Shared UI: `Payers.tsx`, `Crop.tsx` (+ stackLayout for long receipts), `Camera.tsx`, `Avatar.tsx`, `FormHeader.tsx`, `Activity.tsx`.
 - `supabase/migrations/*.sql` — schema history. `supabase/db.test.ts` — RLS/trigger tests.
 
