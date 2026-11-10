@@ -93,3 +93,8 @@ export function useIsAdmin() {
   useEffect(() => { sb.from('app_admins').select('user_id').then((r) => setAdmin(!!r.data?.length)) }, [])
   return admin
 }
+
+// Admin tools in group pages only show while the admin has switched "admin mode" on (per device, in account settings).
+export const ADMIN_MODE = 'admin-mode'
+export const adminModeOn = () => { try { return localStorage.getItem(ADMIN_MODE) === '1' } catch { return false } }
+export const useAdminMode = () => useIsAdmin() && adminModeOn()

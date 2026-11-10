@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, Bell, BellOff, CircleCheck, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { BILL_COLS, fetchRates, must, sb, shrink, useIsAdmin, useSession } from './supabase'
+import { BILL_COLS, fetchRates, must, sb, shrink, ADMIN_MODE, adminModeOn, useIsAdmin, useSession } from './supabase'
 import { Avatar } from './Avatar'
 import { AvatarCropper } from './Crop'
 import { PaymentQR } from './SettleUp'
@@ -258,6 +258,11 @@ function Profile({ session }: { session: Session }) {
     toast('บันทึกแล้ว')
   }
   const admin = useIsAdmin()
+  const [adminMode, setAdminMode] = useState(adminModeOn)
+  const toggleAdminMode = () => {
+    try { localStorage.setItem(ADMIN_MODE, adminMode ? '0' : '1') } catch { /* private mode */ }
+    setAdminMode(!adminMode); toast(adminMode ? 'ปิดโหมดผู้ดูแลแล้ว' : 'เปิดโหมดผู้ดูแลแล้ว')
+  }
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   useEffect(() => { pushSub().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
@@ -309,6 +314,11 @@ function Profile({ session }: { session: Session }) {
       </div>
       <button className="ghost" style={{ width: '100%' }} disabled={pushBusy} aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
       {admin && <Link className="button ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} to="/admin"><ShieldCheck size={20} aria-hidden /> หน้าผู้ดูแล</Link>}
+      {admin && (
+        <button className="ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} aria-pressed={adminMode} onClick={toggleAdminMode}>
+          {adminMode ? 'ปิดโหมดผู้ดูแล (ซ่อนปุ่มเอาคนออก, อีเมล)' : 'เปิดโหมดผู้ดูแลในหน้าทริป'}
+        </button>
+      )}
       <button className="ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}
       {cropping && <AvatarCropper file={cropping} onDone={upload} onClose={() => setCropping(undefined)} />}

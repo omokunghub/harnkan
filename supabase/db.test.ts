@@ -327,3 +327,12 @@ test('admin monitor sees every user and trip, read-only; nobody else sees anythi
   expect(await as(B, `select * from admin_groups()`)).toHaveLength(0)
   await expect(as(B, `select admin_group($1)`, [g])).rejects.toThrow('admin only')
 })
+
+test('member emails are for the admin only', async () => {
+  const { q, as } = await setup()
+  await q(`insert into app_admins (user_id) values ($1)`, [A])
+  await q(`update auth.users set email = 'b@x.test' where id = $1`, [B])
+  const [{ id: g }] = await as(B, `select create_group('B trip') as id`)
+  expect(await as(A, `select email from admin_member_emails($1)`, [g])).toEqual([{ email: 'b@x.test' }])
+  expect(await as(B, `select * from admin_member_emails($1)`, [g])).toHaveLength(0)
+})

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, Check, Heart, House, Link2, List, Pencil, Plane, RefreshCw, UserMinus, UserPlus, X, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
-import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, share, shrink, useIsAdmin, useRates, type Member } from './supabase'
+import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, share, shrink, useAdminMode, useRates, type Member } from './supabase'
 import { balances, convertNet, fmt } from './money'
 import { Avatar } from './Avatar'
 
@@ -36,7 +36,8 @@ export function GroupSettings({ session }: { session: Session }) {
   const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null; email: string }[]>() // admin: add without a link
   const [mergeFor, setMergeFor] = useState<Member>() // guest being deleted / handed over
   const [into, setInto] = useState('')
-  const admin = useIsAdmin()
+  const admin = useAdminMode()
+  const [emails, setEmails] = useState<Map<string, string>>(new Map())
   const fx = useRates(group?.currency ?? 'THB')
 
   const load = async () => {
@@ -49,6 +50,9 @@ export function GroupSettings({ session }: { session: Session }) {
     setGroup(must(g)); setMembers(must(m) as unknown as Member[]); setNet(balances(must(b), must(s)))
   }
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (admin) sb.rpc('admin_member_emails', { g: id }).then((r) => setEmails(new Map((r.data ?? []).map((x: { user_id: string; email: string }) => [x.user_id, x.email]))))
+  }, [admin, id])
 
   const addGuest = async (e: FormEvent) => {
     e.preventDefault()
@@ -139,6 +143,7 @@ export function GroupSettings({ session }: { session: Session }) {
             <span className="grow">
               <b>{memberName(m)}{m.user_id === session.user.id ? ' (คุณ)' : ''}</b>
               {!m.user_id && <small className="muted">guest</small>}
+              {admin && m.user_id && <small className="muted">{emails.get(m.user_id)}</small>}
             </span>
             <span className="right">
               {mine.length ? mine.map(([cur, v]) => (
@@ -152,7 +157,7 @@ export function GroupSettings({ session }: { session: Session }) {
             {admin && m.user_id !== session.user.id && (
               m.user_id && <button className="icon-btn" aria-label={`เอา ${memberName(m)} ออกจากกลุ่ม`} onClick={() => remove(m, mine.length > 0)}><UserMinus size={20} /></button>
             )}
-            {!m.user_id && (
+            {admin && !m.user_id && (
               <button className="icon-btn" aria-label={`ลบหรือย้ายยอดของ ${memberName(m)}`} aria-expanded={mergeFor?.id === m.id}
                 onClick={() => { setMergeFor(mergeFor?.id === m.id ? undefined : m); setInto('') }}><UserMinus size={20} /></button>
             )}
