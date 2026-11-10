@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router'
 import generatePayload from 'promptpay-qr'
 import QRCode from 'qrcode'
 import { FormHeader } from './FormHeader'
+import { toast } from './Toast'
 import { CURRENCIES, MEMBER_COLS, memberName, must, sb, shrink, useSignedUrl, type Member } from './supabase'
 
 // The payee's own QR image (bank app, TrueMoney, foreign wallets). Amount must be typed in their app.
@@ -60,6 +61,7 @@ export default function SettleUp() {
         must(await sb.storage.from('receipts').upload(slip_path, await shrink(slip), { contentType: 'image/jpeg' }))
       }
       must(await sb.from('settlements').insert({ id: sid, group_id: id, ...f, amount: Number(f.amount), slip_path }))
+      toast('บันทึกการโอนแล้ว')
       nav(`/g/${id}`, { replace: true })
     } catch (e) {
       setErr((e as Error).message)

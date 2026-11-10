@@ -14,6 +14,7 @@ import NewBill from './NewBill'
 import BillPage from './Bill'
 import SettleUp from './SettleUp'
 import { AdminHome, AdminTrip } from './Admin'
+import { toast, Toaster } from './Toast'
 
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window))
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/b/:id" element={<BillPage session={session} />} />
         <Route path="/b/:id/edit" element={<NewBill session={session} />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
   )
 }
@@ -137,6 +139,7 @@ function Groups({ session }: { session: Session }) {
     try {
       must(await sb.rpc('set_group_hidden', { g: g.id, hide }))
       setGroups(groups.map((x) => (x.id === g.id ? { ...x, hidden: hide } : x)))
+      toast(hide ? `ซ่อน ${g.name} แล้ว` : `เลิกซ่อน ${g.name} แล้ว`)
     } catch (e) { setMsg(`ทำไม่สำเร็จ: ${(e as Error).message}`) }
   }
   const row = (g: Trip) => {
@@ -225,7 +228,7 @@ function Profile({ session }: { session: Session }) {
       const path = `${uid}/${Date.now()}.jpg`
       must(await sb.storage.from('avatars').upload(path, photo, { contentType: 'image/jpeg' }))
       await setAvatar(sb.storage.from('avatars').getPublicUrl(path).data.publicUrl)
-      setMsg('เปลี่ยนรูปแล้ว')
+      toast('เปลี่ยนรูปแล้ว')
     } catch (e) {
       setMsg(`อัปโหลดไม่สำเร็จ: ${(e as Error).message}`)
     }
@@ -243,7 +246,7 @@ function Profile({ session }: { session: Session }) {
       must(await sb.from('profiles').update({ payment_qr_path: path }).eq('id', uid))
       if (p.payment_qr_path) await sb.storage.from('payment-qr').remove([p.payment_qr_path])
       setP((x) => ({ ...x, payment_qr_path: path }))
-      setMsg(file ? 'บันทึก QR แล้ว' : 'ลบ QR แล้ว')
+      toast(file ? 'บันทึก QR แล้ว' : 'ลบ QR แล้ว')
     } catch (e) {
       setMsg(`ไม่สำเร็จ: ${(e as Error).message}`)
     }
@@ -252,20 +255,21 @@ function Profile({ session }: { session: Session }) {
   const save = async (e: FormEvent) => {
     e.preventDefault()
     must(await sb.from('profiles').update({ display_name: p.display_name.trim(), promptpay: p.promptpay || null }).eq('id', uid))
-    setMsg('บันทึกแล้ว')
+    toast('บันทึกแล้ว')
   }
   const admin = useIsAdmin()
   const [pushOn, setPushOn] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
   useEffect(() => { pushSub().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
   const push = async () => {
-    if (busy) return // each tap talks to the server; rapid taps would overlap
-    setBusy(true); setMsg('')
+    if (pushBusy) return // each tap talks to the server; rapid taps would overlap
+    setPushBusy(true); setMsg('')
     try {
       await (pushOn ? disablePush() : enablePush())
-      setMsg(pushOn ? 'ปิดแจ้งเตือนแล้ว' : 'เปิดแจ้งเตือนแล้ว')
+      toast(pushOn ? 'ปิดแจ้งเตือนแล้ว' : 'เปิดแจ้งเตือนแล้ว')
     } catch (e) { setMsg(String((e as Error).message ?? e)) }
     setPushOn(!!(await pushSub().catch(() => null))) // show what the device really has
-    setBusy(false)
+    setPushBusy(false)
   }
   return (
     <main>
@@ -303,7 +307,7 @@ function Profile({ session }: { session: Session }) {
         </label>
         {p.payment_qr_path && <button type="button" className="ghost" disabled={busy} onClick={() => setQr()}>ลบ QR</button>}
       </div>
-      <button className="ghost" style={{ width: '100%' }} disabled={busy} aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
+      <button className="ghost" style={{ width: '100%' }} disabled={pushBusy} aria-pressed={pushOn} onClick={push}>{pushOn ? <BellOff size={20} aria-hidden /> : <Bell size={20} aria-hidden />} {pushOn ? 'ปิดแจ้งเตือน' : 'เปิดแจ้งเตือน'}</button>
       {admin && <Link className="button ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} to="/admin"><ShieldCheck size={20} aria-hidden /> หน้าผู้ดูแล</Link>}
       <button className="ghost" style={{ width: '100%', marginTop: 'var(--s2)' }} onClick={() => sb.auth.signOut()}>ออกจากระบบ</button>
       {msg && <p className="muted" role="status">{msg}</p>}

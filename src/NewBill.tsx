@@ -7,6 +7,7 @@ import { CropView, cleanBox, type Box } from './Crop'
 import { Camera, canUseCamera } from './Camera'
 import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers, type Payers } from './Payers'
+import { toast } from './Toast'
 import { applyRates, checkReceipt, fmt, shortName, toMinor, type Bill } from './money'
 
 type Row = { id: string; name: string; name_translated: string; qty: number; line_total: number; details: string; crop: Box | null }
@@ -142,6 +143,7 @@ export default function NewBill({ session }: { session: Session }) {
         must(r)
       }
       await savePayers(billId, payers)
+      toast('บันทึกบิลแล้ว')
       nav(`/b/${billId}`, { replace: true })
     } catch (err) {
       setSaveErr(`บันทึกไม่สำเร็จ: ${(err as Error).message} — ลองกดอีกครั้ง`)

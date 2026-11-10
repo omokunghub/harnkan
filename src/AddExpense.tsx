@@ -6,6 +6,7 @@ import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, type 
 import { Avatar } from './Avatar'
 import { FormHeader } from './FormHeader'
 import { checkPayers, mainPayer, PayerPicker, payerLabel, savePayers } from './Payers'
+import { toast } from './Toast'
 import { detectSplit, fmt, shortName, splitWeights, toMinor, type SplitMode } from './money'
 
 const MODES: [SplitMode, string][] = [['equal', 'เท่ากัน'], ['exact', 'กำหนดยอด'], ['percent', 'เปอร์เซ็นต์'], ['shares', 'จำนวนส่วน']]
@@ -85,6 +86,7 @@ export default function AddExpense({ session }: { session: Session }) {
       must(await sb.from('bill_items').upsert({ id: iid, bill_id: billId, name: f.title, line_total: total }))
       must(await sb.from('item_shares').upsert(shares))
       must(await sb.from('item_shares').delete().eq('item_id', iid).not('member_id', 'in', `(${Object.keys(weights).join(',')})`))
+      toast('บันทึกแล้ว')
       nav(`/b/${billId}`, { replace: true })
     } catch (e) {
       setErr((e as Error).message)
