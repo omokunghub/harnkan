@@ -6,6 +6,7 @@ import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, share, useSignedU
 import { allocate, checkReceipt, fmt, paidBy, shortName, toMinor, UNCLAIMED, type Bill, type Item } from './money'
 import { Avatar } from './Avatar'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
+import { toast } from './Toast'
 import { CropEditor, CropView, type Box } from './Crop'
 
 type ItemRow = Item & { id: string; name: string; name_translated: string | null; position: number; qty: number; details: string | null; crop: Box | null; crop_angle: number }
@@ -71,23 +72,24 @@ export default function BillPage({ session }: { session: Session }) {
   const splitAll = async () => {
     if (!confirm('ติ๊กทุกคนในทุกรายการ (หารเท่ากัน)?')) return
     must(await sb.from('item_shares').upsert(bill.bill_items.flatMap((i) => members.map((m) => ({ item_id: i.id, member_id: m.id, weight: 1 })))))
-    load()
+    load(); toast('หารเท่ากันทุกคนแล้ว')
   }
   const remove = async () => {
     if (!confirm('ลบบิลนี้?')) return
     must(await sb.from('bills').delete().eq('id', id))
     if (bill.image_path) await sb.storage.from('receipts').remove([bill.image_path])
+    toast('ลบบิลแล้ว')
     nav(`/g/${bill.group_id}`, { replace: true })
   }
   const saveItem = async (e: FormEvent) => {
     e.preventDefault()
     if (!draft) return
     must(await sb.from('bill_items').update({ name: draft.name.trim(), details: draft.details.trim() || null, qty: Math.max(1, Math.round(Number(draft.qty)) || 1), line_total: Number(draft.line_total) }).eq('id', draft.id))
-    setDraft(undefined); load()
+    setDraft(undefined); load(); toast('บันทึกรายการแล้ว')
   }
   const saveCrop = async (crop: Box | null, crop_angle: number) => {
     must(await sb.from('bill_items').update({ crop, crop_angle }).eq('id', cropFor!.id))
-    setCropFor(undefined); load()
+    setCropFor(undefined); load(); toast('บันทึกรูปรายการแล้ว')
   }
   const warnings = simple ? [] : checkReceipt(bill)
   const comment = async (e: FormEvent) => {

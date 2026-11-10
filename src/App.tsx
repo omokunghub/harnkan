@@ -127,6 +127,7 @@ function Groups({ session }: { session: Session }) {
   const create = async (e: FormEvent) => {
     e.preventDefault()
     nav(`/g/${must(await sb.rpc('create_group', { group_name: name }))}`)
+    toast(`สร้างกลุ่ม ${name} แล้ว`)
   }
   if (!groups) return null
   const all = groups.flatMap((g) => g.net)
@@ -199,7 +200,7 @@ function Join() {
   const nav = useNavigate()
   const [err, setErr] = useState('')
   useEffect(() => {
-    sb.rpc('join_group', { code }).then((r) => (r.error ? setErr(r.error.message) : nav(`/g/${r.data}`, { replace: true })))
+    sb.rpc('join_group', { code }).then((r) => (r.error ? setErr(r.error.message) : (nav(`/g/${r.data}`, { replace: true }), toast('เข้ากลุ่มแล้ว'))))
   }, [code, nav])
   return <main className="center">{err ? <p className="bad">ลิงก์เชิญใช้ไม่ได้: {err}</p> : <p>กำลังเข้ากลุ่ม…</p>}</main>
 }

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import type { Session } from '@supabase/supabase-js'
 import { active, BILL_COLS, CURRENCIES, MEMBER_COLS, memberName, must, sb, share, shrink, useAdminMode, useRates, type Member } from './supabase'
 import { balances, convertNet, fmt } from './money'
+import { toast } from './Toast'
 import { Avatar } from './Avatar'
 
 export type Group = { id: string; name: string; invite_code: string; type: string; start_on: string | null; end_on: string | null; cover_url: string | null; currency: string }
@@ -57,18 +58,20 @@ export function GroupSettings({ session }: { session: Session }) {
   const addGuest = async (e: FormEvent) => {
     e.preventDefault()
     must(await sb.from('members').insert({ group_id: id, guest_name: guest.trim() }))
+    toast(`เพิ่ม ${guest.trim()} แล้ว`)
     setGuest(''); setAdding(false); load()
   }
   const listPeople = async () => setPeople(people ? undefined : must(await sb.rpc('admin_list_users', { g: id })) as NonNullable<typeof people>)
   const addPerson = async (u: string) => {
     must(await sb.rpc('admin_add_member', { g: id, u }))
+    toast(`เพิ่ม ${people?.find((p) => p.id === u)?.display_name ?? 'เพื่อน'} เข้ากลุ่มแล้ว`)
     setPeople(people?.filter((p) => p.id !== u)); load()
   }
   const remove = async (m: Member, owes: boolean) => {
     const warn = owes ? '\n\n⚠ คนนี้ยังมียอดค้างอยู่ ควรเคลียร์ก่อน' : ''
     if (!confirm(`เอา ${memberName(m)} ออกจากกลุ่ม?${warn}\n\nชื่อจะยังอยู่ในบิลเก่า แต่จะเข้ากลุ่มไม่ได้อีกจนกว่าจะได้ลิงก์เชิญใหม่`)) return
     must(await sb.rpc('remove_member', { m: m.id }))
-    load()
+    load(); toast(`เอา ${memberName(m)} ออกจากกลุ่มแล้ว`)
   }
   // Guest → hand their ticks/payments to `into` (or nobody, if they have nothing) and delete them.
   const mergeGuest = async () => {
@@ -76,12 +79,13 @@ export function GroupSettings({ session }: { session: Session }) {
     if (!confirm(target ? `ย้ายทุกอย่างของ ${memberName(mergeFor)} (ที่ติ๊ก, ที่จ่าย, ที่โอน) ไปเป็นของ ${memberName(target)} แล้วลบ ${memberName(mergeFor)}?` : `ลบ ${memberName(mergeFor)}?`)) return
     const r = await sb.rpc('merge_guest', { guest: mergeFor!.id, into_member: into || null })
     if (r.error) return alert(r.error.message.includes('pick who') ? `${memberName(mergeFor)} มีบิลอยู่ เลือกก่อนว่าจะให้ใครรับยอดแทน` : r.error.message)
+    toast(target ? `ย้ายยอดให้ ${memberName(target)} แล้ว` : `ลบ ${memberName(mergeFor)} แล้ว`)
     setMergeFor(undefined); setInto(''); load()
   }
   const resetInvite = async () => {
     if (!confirm('เปลี่ยนลิงก์เชิญ? ลิงก์เก่าที่เคยส่งไปจะใช้ไม่ได้ทันที')) return
     must(await sb.rpc('reset_invite', { g: id }))
-    load(); alert('เปลี่ยนลิงก์แล้ว กด "ชวนเพื่อนด้วยลิงก์" เพื่อส่งลิงก์ใหม่')
+    load(); toast('เปลี่ยนลิงก์แล้ว กด "ชวนเพื่อนด้วยลิงก์" เพื่อส่งลิงก์ใหม่')
   }
   if (!group) return null
   const typeName = (GROUP_TYPES[group.type] ?? GROUP_TYPES.other)[1]
@@ -208,7 +212,7 @@ export function EditGroup() {
       }
       must(await sb.from('groups').update({ cover_url }).eq('id', id))
       if (f.cover_url) await sb.storage.from('covers').remove([f.cover_url.split('/covers/')[1]])
-      setF({ ...f, cover_url })
+      setF({ ...f, cover_url }); toast(file ? 'เปลี่ยนรูปปกแล้ว' : 'ลบรูปปกแล้ว')
     } catch (e) {
       setErr(`เปลี่ยนรูปปกไม่สำเร็จ: ${(e as Error).message}`)
     }
@@ -220,6 +224,7 @@ export function EditGroup() {
     const dates = f.type === 'trip' && hasDates ? { start_on: f.start_on || null, end_on: f.end_on || null } : { start_on: null, end_on: null }
     const r = await sb.from('groups').update({ name: f.name.trim(), type: f.type, currency: f.currency, ...dates }).eq('id', id)
     if (r.error) return setErr(r.error.message.includes('trip_dates') ? 'วันสิ้นสุดต้องไม่ก่อนวันเริ่ม' : r.error.message)
+    toast('บันทึกแล้ว')
     nav(`/g/${id}/settings`, { replace: true })
   }
 

@@ -6,6 +6,7 @@ import { active, BILL_COLS, MEMBER_COLS, memberName, must, sb, useRates, useSign
 import { Avatar } from './Avatar'
 import { TypeIcon, tripDates, type Group } from './GroupSettings'
 import { ACTIVITY_COLS, ActivityLog, type Entry } from './Activity'
+import { toast } from './Toast'
 import { allocate, balances, fmt, inOne, memberNet, paidBy, shortName, simplify, toMajor, toMinor, UNCLAIMED, type Bill, type Settlement } from './money'
 
 type BillRow = Bill & { id: string; title: string; spent_on: string; created_at: string; image_path: string | null }
@@ -200,7 +201,7 @@ function SettleLine({ s, name, onDeleted }: { s: SettlementRow; name: (id: strin
     if (!confirm(`ลบรายการโอน ${name(s.from_member)} → ${name(s.to_member)} ${fmt(toMinor(s.amount, s.currency), s.currency)}?`)) return
     must(await sb.from('settlements').delete().eq('id', s.id))
     if (s.slip_path) await sb.storage.from('receipts').remove([s.slip_path])
-    onDeleted()
+    onDeleted(); toast('ลบรายการโอนแล้ว')
   }
   return (
     <div className="line">

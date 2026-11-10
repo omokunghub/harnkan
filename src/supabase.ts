@@ -1,5 +1,6 @@
 import { createClient, type Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
+import { toast } from './Toast'
 import { stackLayout } from './Crop'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
@@ -35,7 +36,7 @@ export function useSignedUrl(path?: string | null, bucket = 'receipts') {
 // LINE etc. via the OS share sheet; desktop falls back to clipboard.
 export async function share(title: string, url: string) {
   if (navigator.share) await navigator.share({ title, url }).catch(() => {})
-  else await navigator.clipboard.writeText(url).then(() => alert('คัดลอกลิงก์แล้ว'))
+  else await navigator.clipboard.writeText(url).then(() => toast('คัดลอกลิงก์แล้ว'))
 }
 
 // Shrink to ~1600px JPEG: smaller upload, fewer Gemini tokens, ~250KB in storage.
