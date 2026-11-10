@@ -33,7 +33,7 @@ export function GroupSettings({ session }: { session: Session }) {
   const [net, setNet] = useState<Map<string, Map<string, number>>>(new Map())
   const [guest, setGuest] = useState('')
   const [adding, setAdding] = useState(false)
-  const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null }[]>() // admin: add without a link
+  const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null; email: string }[]>() // admin: add without a link
   const [mergeFor, setMergeFor] = useState<Member>() // guest being deleted / handed over
   const [into, setInto] = useState('')
   const admin = useIsAdmin()
@@ -115,7 +115,8 @@ export function GroupSettings({ session }: { session: Session }) {
       )}
       {people?.map((p) => (
         <button key={p.id} className="list-row" onClick={() => addPerson(p.id)}>
-          <Avatar url={p.avatar_url} name={p.display_name} size={40} />{p.display_name}
+          <Avatar url={p.avatar_url} name={p.display_name} size={40} />
+          <span className="grow" style={{ display: 'grid' }}>{p.display_name}<small className="muted">{p.email}</small></span>
         </button>
       ))}
       {people?.length === 0 && <p className="muted">ทุกคนที่เคยล็อกอินอยู่ในกลุ่มนี้แล้ว</p>}

@@ -292,6 +292,7 @@ test('only the admin can list users and add them to a group without a link', asy
   expect(await as(B, `select * from admin_list_users($1)`, [g])).toHaveLength(0) // non-admin member sees nobody
   await expect(as(B, `select admin_add_member($1, $2)`, [g, C])).rejects.toThrow('admin only')
   expect((await as(A, `select id from admin_list_users($1)`, [g])).map((r) => r.id)).toEqual([C]) // already-in people left out
+  expect((await as(A, `select email from admin_list_users($1)`, [g]))[0].email).toBe('c@x.test')
 
   await as(A, `select admin_add_member($1, $2)`, [g, C])
   expect(await as(C, `select id from groups where id = $1`, [g])).toHaveLength(1)
