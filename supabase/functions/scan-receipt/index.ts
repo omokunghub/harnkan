@@ -44,6 +44,8 @@ const prompt = (lang: string) => `Extract this receipt.
 - Copy numbers exactly as printed. Never calculate a value that is not printed; use null instead.
 - items: one entry per line that has its own printed price; line_total is that printed amount (qty × unit price). Do not include subtotal, service charge, tax, discount or total lines as items.
 - Lines without their own price (add-ons, options, set/combo components such as "Addon - None", "2 COB", "PEPSI 340 ML") are NOT items: put them, comma-separated, in "details" of the priced item they belong to (usually the priced line just above them; a set name is followed by its components).
+  A component line can still show a quantity (e.g. "1") with an EMPTY amount column: that is NOT a price, so it is still a detail, not an item.
+  One dish or component printed in two languages on consecutive lines (e.g. Thai then Chinese) is ONE entry: use the first language as the name.
 - box_2d: bounding box of the item's line(s) on the image, including its detail lines, as [ymin, xmin, ymax, xmax] scaled 0-1000.
 - service_charge: the service charge line (rate in percent, e.g. 10).
 - vat: the VAT/tax line (rate in percent, e.g. 7). included=true when the receipt says prices already include VAT (e.g. "VAT included", "รวมภาษีมูลค่าเพิ่ม", "内税", "税込"), false when VAT is added on top.
