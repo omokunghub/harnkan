@@ -65,8 +65,12 @@ export default function NewBill({ session }: { session: Session }) {
     })
   }, [groupId, session.user.id])
 
-  const addPhotos = (files: FileList | File[] | null | undefined) =>
-    files?.length && setPhotos((p) => [...p, ...[...files].map((file) => ({ file, url: URL.createObjectURL(file) }))])
+  // Copy the files right away: the picker's `value = ''` reset empties the same FileList in Chrome,
+  // and React runs the setPhotos updater later.
+  const addPhotos = (files: FileList | File[] | null | undefined) => {
+    const added = [...(files ?? [])].map((file) => ({ file, url: URL.createObjectURL(file) }))
+    if (added.length) setPhotos((p) => [...p, ...added])
+  }
   const scan = async () => {
     if (!photos.length) return
     setBusy(true); setStatus(photos.length > 1 ? `กำลังต่อ ${photos.length} รูปแล้วอ่านใบเสร็จ…` : 'กำลังอ่านใบเสร็จ…')
