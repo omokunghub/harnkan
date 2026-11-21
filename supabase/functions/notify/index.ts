@@ -1,4 +1,5 @@
-// Called by Database Webhooks on INSERT into bill_notifies (friend added to a bill) and settlements (tell the creditor).
+// Called by Database Webhooks on INSERT into bill_notifies (friend added to a bill), member_notifies (friend added to a group)
+// and settlements (tell the creditor).
 // Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:you@...), NOTIFY_SECRET
 // Deploy: npx supabase functions deploy notify --no-verify-jwt
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -27,6 +28,15 @@ Deno.serve(async (req) => {
     to = member?.user_id
     const group = bill.groups as unknown as { name: string } | null
     msg = { title: group?.name ?? 'หารกัน', body: `${actor?.display_name || 'เพื่อน'} เพิ่มคุณในบิล ${bill.title}`, url: `/b/${record.bill_id}` }
+  } else if (table === 'member_notifies') {
+    const [{ data: m }, { data: actor }] = await Promise.all([
+      sb.from('members').select('user_id, group_id, groups(name)').eq('id', record.member_id).single(),
+      sb.from('profiles').select('display_name').eq('id', record.actor).single(),
+    ])
+    if (!m) return new Response('gone')
+    to = m.user_id
+    const group = m.groups as unknown as { name: string } | null
+    msg = { title: group?.name ?? 'หารกัน', body: `${actor?.display_name || 'เพื่อน'} เพิ่มคุณเข้ากลุ่ม ${group?.name ?? ''}`.trim(), url: `/g/${m.group_id}` }
   } else if (table === 'settlements') {
     const [creditor, payer, { data: group }] = await Promise.all([
       memberOf(record.to_member), memberOf(record.from_member),

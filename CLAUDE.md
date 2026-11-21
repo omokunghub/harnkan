@@ -10,7 +10,7 @@ Live: https://harnkan-7a6.pages.dev · Supabase project ref `oncuqybkluuifmvomws
 - **Supabase**: Postgres + RLS (all access control lives here), Auth (Google only), Storage, Realtime, Edge Functions.
 - **Edge function `scan-receipt`**: the only server code. Checks the caller is in a group, calls Gemini with a model
   fallback chain (`GEMINI_MODELS` secret, default flash-lite → flash → 2.5-flash-lite), returns JSON items with `details` and `box_2d`.
-- Edge function `notify`: web push, called by Database Webhooks on INSERT into `bill_notifies` and `settlements`.
+- Edge function `notify`: web push, called by Database Webhooks on INSERT into `bill_notifies`, `member_notifies` and `settlements`.
 - `.github/workflows/deploy.yml`: push to main (= merging a PR) runs tests, then deploys the frontend and both edge functions. It does not apply SQL.
 - `.github/workflows/keepalive.yml` pings Supabase every 3 days so the free project doesn't pause.
 

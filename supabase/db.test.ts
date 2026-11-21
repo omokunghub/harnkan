@@ -306,6 +306,40 @@ test('only the admin can list users and add them to a group without a link', asy
   expect(await q(`select removed_at from members where id = $1`, [mC])).toEqual([{ removed_at: null }])
 })
 
+test('any member can add a friend from another trip without a link, and the friend gets a push row', async () => {
+  const { q, as } = await setup()
+  const [{ id: g1 }] = await as(A, `select create_group('old trip') as id`)
+  const [{ invite_code }] = await q(`select invite_code from groups where id = $1`, [g1])
+  await as(B, `select join_group($1)`, [invite_code])
+  const [{ id: g2 }] = await as(B, `select create_group('new trip') as id`)
+  expect(await q(`select * from member_notifies`)).toHaveLength(0) // creating / joining yourself isn't news
+
+  await q(`update auth.users set email = 'a@x.test' where id = $1`, [A])
+  expect(await as(B, `select id, email from list_friends($1)`, [g2])).toEqual([{ id: A, email: null }]) // stranger C not listed, no emails
+  await expect(as(B, `select add_friend($1, $2)`, [g2, C])).rejects.toThrow('not your friend')
+  await expect(as(C, `select add_friend($1, $2)`, [g2, A])).rejects.toThrow('not your friend') // not in the trip
+  expect(await as(C, `select * from list_friends($1)`, [g2])).toHaveLength(0)
+
+  await as(B, `select add_friend($1, $2)`, [g2, A])
+  expect(await as(A, `select id from groups where id = $1`, [g2])).toHaveLength(1)
+  expect(await as(B, `select * from list_friends($1)`, [g2])).toHaveLength(0)
+  const [{ id: mA }] = await q(`select id from members where user_id = $1 and group_id = $2`, [A, g2])
+  expect(await q(`select member_id, actor from member_notifies`)).toEqual([{ member_id: mA, actor: B }])
+  expect(await as(A, `select * from member_notifies`)).toHaveLength(0)
+  expect(await q(`select * from activity where action = 'member_add'`)).toHaveLength(1)
+
+  await q(`update members set removed_at = now() where id = $1`, [mA]) // admin removed A
+  await as(B, `select add_friend($1, $2)`, [g2, A]) // back on the same row, notified again
+  expect(await q(`select * from member_notifies`)).toHaveLength(2)
+  await as(B, `insert into members (group_id, guest_name) values ($1, 'Guest')`, [g2]) // guests have no phone
+  expect(await q(`select * from member_notifies`)).toHaveLength(2)
+
+  await q(`insert into app_admins (user_id) values ($1)`, [C])
+  await as(C, `select join_group($1)`, [invite_code])
+  const [{ id: g3 }] = await as(C, `select create_group('admin trip') as id`)
+  expect((await as(C, `select email from list_friends($1) where id = $2`, [g3, A]))[0].email).toBe('a@x.test') // admin sees emails
+})
+
 test('admin monitor sees every user and trip, read-only; nobody else sees anything', async () => {
   const { q, as } = await setup()
   await q(`insert into app_admins (user_id) values ($1)`, [A])
