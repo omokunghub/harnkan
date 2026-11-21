@@ -24,24 +24,3 @@ begin
   insert into activity (group_id, action, detail) values (g, 'member_add', jsonb_build_object('member', m));
 end $$;
 
--- Web push "X added you to <trip>": one row each time someone else puts a real user into a group.
--- Database Webhook on INSERT here → notify function. Joining by link yourself isn't news.
-create table member_notifies (
-  id bigint generated always as identity primary key,
-  member_id uuid not null references members on delete cascade,
-  actor uuid not null references auth.users on delete cascade,
-  created_at timestamptz not null default now()
-);
-alter table member_notifies enable row level security; -- no policies: only the trigger writes, only the notify function reads
-
-create function queue_member_notify() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  if new.user_id is not null and new.user_id <> auth.uid() and new.removed_at is null
-     and (tg_op = 'INSERT' or old.removed_at is not null) then
-    insert into member_notifies (member_id, actor) values (new.id, auth.uid());
-  end if;
-  return null;
-end $$;
-create trigger queue_member_notify after insert or update of removed_at on members
-  for each row execute function queue_member_notify();
