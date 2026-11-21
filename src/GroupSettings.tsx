@@ -34,7 +34,7 @@ export function GroupSettings({ session }: { session: Session }) {
   const [net, setNet] = useState<Map<string, Map<string, number>>>(new Map())
   const [guest, setGuest] = useState('')
   const [adding, setAdding] = useState(false)
-  const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null; email: string }[]>() // admin: add without a link
+  const [people, setPeople] = useState<{ id: string; display_name: string; avatar_url: string | null; email: string | null }[]>() // friends from other trips (admin: everyone)
   const [mergeFor, setMergeFor] = useState<Member>() // guest being deleted / handed over
   const [into, setInto] = useState('')
   const admin = useAdminMode()
@@ -61,9 +61,9 @@ export function GroupSettings({ session }: { session: Session }) {
     toast(`เพิ่ม ${guest.trim()} แล้ว`)
     setGuest(''); setAdding(false); load()
   }
-  const listPeople = async () => setPeople(people ? undefined : must(await sb.rpc('admin_list_users', { g: id })) as NonNullable<typeof people>)
+  const listPeople = async () => setPeople(people ? undefined : must(await sb.rpc('list_friends', { g: id })) as NonNullable<typeof people>)
   const addPerson = async (u: string) => {
-    must(await sb.rpc('admin_add_member', { g: id, u }))
+    must(await sb.rpc('add_friend', { g: id, u }))
     toast(`เพิ่ม ${people?.find((p) => p.id === u)?.display_name ?? 'เพื่อน'} เข้ากลุ่มแล้ว`)
     setPeople(people?.filter((p) => p.id !== u)); load()
   }
@@ -116,18 +116,16 @@ export function GroupSettings({ session }: { session: Session }) {
           <button>เพิ่ม</button>
         </form>
       )}
-      {admin && (
-        <button className="list-row" aria-expanded={!!people} onClick={listPeople}>
-          <span className="row-icon" aria-hidden><UserPlus size={24} /></span>เพิ่มเพื่อนที่มีบัญชีแล้ว (ไม่ต้องส่งลิงก์)
-        </button>
-      )}
+      <button className="list-row" aria-expanded={!!people} onClick={listPeople}>
+        <span className="row-icon" aria-hidden><UserPlus size={24} /></span>เพิ่มเพื่อนจากทริปอื่น (ไม่ต้องส่งลิงก์)
+      </button>
       {people?.map((p) => (
         <button key={p.id} className="list-row" onClick={() => addPerson(p.id)}>
           <Avatar url={p.avatar_url} name={p.display_name} size={40} />
-          <span className="grow" style={{ display: 'grid' }}>{p.display_name}<small className="muted">{p.email}</small></span>
+          <span className="grow" style={{ display: 'grid' }}>{p.display_name}{p.email && <small className="muted">{p.email}</small>}</span>
         </button>
       ))}
-      {people?.length === 0 && <p className="muted">ทุกคนที่เคยล็อกอินอยู่ในกลุ่มนี้แล้ว</p>}
+      {people?.length === 0 && <p className="muted">{admin ? 'ทุกคนที่เคยล็อกอินอยู่ในกลุ่มนี้แล้ว' : 'เพื่อนจากทริปอื่นอยู่ในกลุ่มนี้ครบแล้ว คนที่ยังไม่เคยอยู่ทริปเดียวกันให้ชวนด้วยลิงก์'}</p>}
       <button className="list-row" onClick={() => share(`เข้ากลุ่ม ${group.name} ในหารกัน`, `${location.origin}/join/${group.invite_code}`)}>
         <span className="row-icon" aria-hidden><Link2 size={24} /></span>ชวนเพื่อนด้วยลิงก์
       </button>
